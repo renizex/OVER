@@ -12,10 +12,10 @@ root.geometry("1920x1080")
 root.grid_columnconfigure(0, weight=1)
 root.grid_rowconfigure(0, weight=1)
 
-from OVER.lexer import lex
-from OVER.parser import parse
-from OVER.evaluator import evaluate
-from OVER.exceptions import InvalidExpressionError
+from over.lexer import lex
+from over.parser import parse
+from over.evaluator import evaluate
+from over.exceptions import InvalidExpressionError
 
 class IDE:
     def __init__(self):
@@ -26,6 +26,7 @@ class IDE:
 ide = IDE()
 
 def run(*_):
+    ide.memory = {}
     try:
         console_text.delete("1.0", "end")
         txt = text.get("1.0", "end-1c")
@@ -70,10 +71,15 @@ def open_file_menu(*_):
 def open_file(*_):
     filename = filedialog.askopenfilename(filetypes=[("Over files", "*.over"), ("all files", "*.*")], title="open Over file", defaultextension=".over")
     if filename:
+        ide.filename = filename
         with open(filename, "r", encoding="utf-8") as file:
             txt = file.read()
         text_delete()
         insert(txt)
+
+def new_file(*_):
+    text_delete()
+    ide.filename = None
 
 def show_editor(*_):
     ide.current_screen = "editor"
@@ -197,8 +203,8 @@ editor_frame.grid(row=1, column=0,sticky="nsew", padx=10, pady=10)
 output_button = ctk.CTkButton(button_editor_frame, text="run", command=run, fg_color="#000000", hover_color="#1A1A1A")
 output_button.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
-delete_button = ctk.CTkButton(button_editor_frame, text="delete", command=text_delete, fg_color="#000000", hover_color="#1A1A1A")
-delete_button.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+new_button = ctk.CTkButton(button_editor_frame, text="new", command=new_file, fg_color="#000000", hover_color="#1A1A1A")
+new_button.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
 
 save_button = ctk.CTkButton(button_editor_frame, text="save", command=save_file, fg_color="#000000", hover_color="#1A1A1A")
 save_button.grid(row=0, column=2, sticky="nsew", padx=10, pady=10)
