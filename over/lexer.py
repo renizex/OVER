@@ -1,11 +1,9 @@
-from typing import TypeAlias
 import re
-from OVER.exceptions import InvalidLexemeError
-import OVER.tokens as tokens
-
-Number: TypeAlias = int | float
+from over.exceptions import InvalidLexemeError
+import over.tokens as tokens
 
 def lex(expression: str) -> list[tokens.Token]:
+    max_tokens = 10000
     tokens_list: list[tokens.Token] = []
     matches = re.finditer(r"(\d+\.\d+|\d+)|([A-Za-z_]\w*)|(==|[+\-*/=()^><{}])|(\s+)|(.)", expression)
     for match in matches:
@@ -29,6 +27,8 @@ def lex(expression: str) -> list[tokens.Token]:
             pass
         elif match.group(5):
             raise InvalidLexemeError(f"ERROR: unknown lexeme '{match.group(5)}' at position {match.start()}.")
+    if len(tokens_list) > max_tokens:
+        raise InvalidLexemeError(f"ERROR: too many tokens in expression.")
     return tokens_list
 
 keywords = {
