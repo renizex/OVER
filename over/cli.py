@@ -1,19 +1,17 @@
-from typing_utils import Number, Memory
-from exceptions import InvalidExpressionError
-from lexer import lex
-from parser import parse
-from evaluator import evaluate
+from over.typing_utils import Number, Memory
+from over.exceptions import InvalidExpressionError
+from over.lexer import lex
+from over.parser import parse
+from over.evaluator import evaluate
 
 def memory_show(memory: dict[str, Number]) -> str:
     if not memory:
         return "memory is empty"
     return '\n'.join(f"{variable} = {number}" for variable, number in memory.items())
 
-
 def memory_clear(memory: dict[str, Number]) -> str:
     memory.clear()
     return "memory cleared"
-
 
 def help_show() -> str:
     return """
@@ -40,7 +38,6 @@ planned:
     functions.
     """.strip()
 
-
 memory_commands = {
     "memory": memory_show,
     "clear": memory_clear
@@ -49,7 +46,6 @@ memory_commands = {
 help_commands = {
     "help": help_show
 }
-
 
 def main() -> None:
     memory: dict[str, Number] = {}
@@ -69,14 +65,12 @@ def main() -> None:
         except InvalidExpressionError as msg:
             print(msg)
 
-
 def check_expression(expression: str, memory: Memory) -> bool:
     if is_command(expression, memory):
         return True
     if expression.strip() == '':
         raise InvalidExpressionError(f"ERROR: empty input.")
     return False
-
 
 def is_command(expression: str, memory: Memory) -> bool:
     if expression in memory_commands:
@@ -86,6 +80,3 @@ def is_command(expression: str, memory: Memory) -> bool:
         print(help_commands[expression]())
         return True
     return False
-
-if __name__ == '__main__':
-    main()
