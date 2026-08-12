@@ -1,7 +1,7 @@
 from typing import NoReturn
-import OVER.tokens as tokens
-import OVER.nodes as nodes
-from OVER.exceptions import InvalidExpressionError
+import over.tokens as tokens
+import over.nodes as nodes
+from over.exceptions import InvalidExpressionError
 
 def parse(tokens_list: list[tokens.Token], expression: str) -> nodes.Node:
     parser = Parser(tokens_list, expression)
@@ -13,6 +13,8 @@ class Parser:
         self.tokens_list = tokens_list
         self.expression = expression
         self.current_index = 0
+        self.count_statements = 0
+        self.count_power = 0
 
     def current(self) -> tokens.Token | None:
         #print(self.current_index, len(self.tokens))
@@ -64,9 +66,12 @@ class Parser:
             self.error(f"ERROR: expected {args}, got {current.value}.")
         return False
 
-    def parse_program(self):
+    def parse_program(self) -> nodes.Node:
         node_list: list[nodes.Node] = []
         while self.current_index < len(self.tokens_list):
+            self.count_statements += 1
+            if self.count_statements > 100:
+                raise InvalidExpressionError("too many statements.")
             node_list.append(self.parse_statement())
         return nodes.BlockNode(node_list)
 
@@ -162,11 +167,15 @@ class Parser:
         return self.parse_power()
 
     def parse_power(self) -> nodes.Node:
+        max_power = 1000
         left = self.parse_factor()
         while True:
             operator = self.consume('^')
             if operator is None:
                 break
+            self.count_power += 1
+            if self.count_power > max_power:
+                raise InvalidExpressionError(f"ERROR: power expression is too deep.")
             right = self.parse_power()
             left = nodes.BinaryOperatorNode(left, operator, right)
         return left
