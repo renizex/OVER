@@ -1,5 +1,5 @@
-from OVER.typing_utils import Number
-from OVER.exceptions import DivisionByZeroError
+from over.typing_utils import Number
+from over.exceptions import DivisionByZeroError
 
 def plus(a: Number, b: Number) -> Number:
     return a+b
