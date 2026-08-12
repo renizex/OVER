@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from OVER.typing_utils import Number
+from over.typing_utils import Number
 
 @dataclass
 class Node:
