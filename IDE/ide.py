@@ -148,8 +148,10 @@ def shortcuts(event):
         if keycode == 79:
             open_file_menu()
     elif ide.current_screen == "editor":
+        if keycode == 86 and event.keysym.lower() != 'v':
+            return paste_text()
         if keycode in keycodes:
-            keycodes[keycode]()
+            return keycodes[keycode]()
         else:
             return
     return "break"
