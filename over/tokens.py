@@ -23,15 +23,19 @@ class ClosingParenthesisToken(Token):
     pass
 
 @dataclass
+class OpeningBraceToken(Token):
+    pass
+
+@dataclass
+class ClosingBraceToken(Token):
+    pass
+
+@dataclass
 class NumberToken(Token):
     value: Number
 
 @dataclass
 class VariableToken(Token):
-    pass
-
-@dataclass
-class EqualToken(Token):
     pass
 
 @dataclass
@@ -47,9 +51,13 @@ class WhileToken(Token):
     pass
 
 @dataclass
-class OpeningBraceToken(Token):
+class FunctionToken(Token):
     pass
 
 @dataclass
-class ClosingBraceToken(Token):
+class ContinueArgsToken(Token):
+    pass
+
+@dataclass
+class ReturnToken(Token):
     pass

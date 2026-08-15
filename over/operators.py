@@ -23,11 +23,20 @@ def power(a: Number, b: Number) -> Number:
 def equal(a: Number, b: Number) -> bool:
     return a == b
 
+def less_equal(a: Number, b: Number) -> bool:
+    return a <= b
+
+def greater_equal(a: Number, b: Number) -> bool:
+    return a >= b
+
 def greater(a: Number, b: Number) -> bool:
     return a > b
 
 def less(a: Number, b: Number) -> bool:
     return a < b
+
+def mod(a: Number, b: Number) -> Number:
+    return a % b
 
 def unary_minus(a: Number) -> Number:
     return -a
@@ -37,10 +46,13 @@ operations = {
     '-': minus,
     '*': multiply,
     '/': divide,
-    '^': power
+    '^': power,
+    '%': mod
 }
 
 comparison = {
+    '<=': less_equal,
+    '>=': greater_equal,
     '==': equal,
     '>': greater,
     '<': less

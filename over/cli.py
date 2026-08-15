@@ -1,8 +1,9 @@
 from over.typing_utils import Number, Memory
-from over.exceptions import InvalidExpressionError
+from over.exceptions import InvalidExpressionError, ReturnStatement
 from over.lexer import lex
 from over.parser import parse
 from over.evaluator import evaluate
+import over.nodes as nodes
 
 def memory_show(memory: dict[str, Number]) -> str:
     if not memory:
@@ -49,6 +50,7 @@ help_commands = {
 
 def main() -> None:
     memory: dict[str, Number] = {}
+    functions: dict[str, nodes.FunctionNode] = {}
     print("AST evaluator")
     print("enter 'help' for commands and operators")
     while True:
@@ -57,13 +59,15 @@ def main() -> None:
             if check_expression(expression, memory):
                 continue
             tokens = lex(expression)
-            node = parse(tokens, expression)
-            output = evaluate(node, memory)
+            node = parse(tokens, expression, functions)
+            output = evaluate(node, memory, functions)
             if output is None:
                 continue
             print(output)
         except InvalidExpressionError as msg:
             print(msg)
+        except ReturnStatement as msg:
+            print(msg.expression)
 
 def check_expression(expression: str, memory: Memory) -> bool:
     if is_command(expression, memory):

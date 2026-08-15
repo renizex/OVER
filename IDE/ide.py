@@ -21,18 +21,20 @@ class IDE:
     def __init__(self):
         self.filename = None
         self.memory = {}
+        self.functions = {}
         self.current_screen = "menu"
 
 ide = IDE()
 
 def run(*_):
     ide.memory = {}
+    ide.functions = {}
     try:
         console_text.delete("1.0", "end")
         txt = text.get("1.0", "end-1c")
         tokens = lex(txt)
-        node = parse(tokens, txt)
-        result = evaluate(node, ide.memory)
+        node = parse(tokens, txt, ide.memory)
+        result = evaluate(node, ide.memory, ide.functions)
         if result is not None:
             console_text.insert("1.0", str(result))
         console_frame.grid(column=0, row=2, sticky="nsew", padx=10, pady=10)
@@ -109,9 +111,10 @@ def copy_text(*_):
 def paste_text(*_):
     try:
         clipboard_text = root.clipboard_get()
+        text.insert("insert", clipboard_text)
     except TclError:
-        return
-    text.insert("insert", clipboard_text)
+        pass
+    return "break"
 
 def cut_text(*_):
     try:
@@ -133,7 +136,6 @@ keycodes = {
     79: open_file,
     82: run,
     83: save_file,
-    86: paste_text,
     88: cut_text,
     90: undo
 }

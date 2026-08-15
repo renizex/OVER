@@ -5,7 +5,7 @@ import over.tokens as tokens
 def lex(expression: str) -> list[tokens.Token]:
     max_tokens = 10000
     tokens_list: list[tokens.Token] = []
-    matches = re.finditer(r"(\d+\.\d+|\d+)|([A-Za-z_]\w*)|(==|[+\-*/=()^><{}])|(\s+)|(.)", expression)
+    matches = re.finditer(r"(\d+\.\d+|\d+)|([A-Za-zА-Яа-я_]\w*)|(==|<=|>=|[,+\-*/=()^><{}%])|(\s+)|(.)", expression)
     for match in matches:
         if match.group(1):
             raw_number = match.group(1)
@@ -34,14 +34,21 @@ def lex(expression: str) -> list[tokens.Token]:
 keywords = {
     'if': tokens.IfToken,
     'else': tokens.ElseToken,
-    'while': tokens.WhileToken
+    'while': tokens.WhileToken,
+    'function': tokens.FunctionToken,
+    'return': tokens.ReturnToken,
+    'если': tokens.IfToken,
+    'иначе': tokens.ElseToken,
+    'пока': tokens.WhileToken,
+    'функция': tokens.FunctionToken,
+    'вернуть': tokens.ReturnToken,
 }
 
 special_operators = {
-    '==': tokens.EqualToken,
     '=': tokens.AssignToken,
     '(': tokens.OpeningParenthesisToken,
     ')': tokens.ClosingParenthesisToken,
     '{': tokens.OpeningBraceToken,
-    '}': tokens.ClosingBraceToken
+    '}': tokens.ClosingBraceToken,
+    ',': tokens.ContinueArgsToken,
 }

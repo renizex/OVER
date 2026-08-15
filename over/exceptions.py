@@ -6,3 +6,7 @@ class InvalidLexemeError(InvalidExpressionError):
 
 class DivisionByZeroError(InvalidExpressionError):
     pass
+
+class ReturnStatement(Exception):
+    def __init__(self, expression):
+        self.expression = expression

@@ -44,3 +44,18 @@ class WhileNode(Node):
     condition: Node
     body: BlockNode
     else_body: BlockNode | None
+
+@dataclass
+class FunctionNode(Node):
+    name: str
+    args: list[VariableNode]
+    body: BlockNode
+
+@dataclass
+class CallNode(Node):
+    name: str
+    args: list[Node]
+
+@dataclass
+class ReturnNode(Node):
+    expression: Node | None
