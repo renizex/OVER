@@ -1,0 +1,77 @@
+import pytest
+from over.nodes import *
+from over.parser import parse
+from over.tokens import *
+
+@pytest.mark.parametrize(
+    "source, tokens, expected",
+    [
+        ("2 + 2",
+         [NumberToken(value=2, position=0), BinaryOperatorToken(value='+', position=2), NumberToken(value=2, position=4)],
+         BlockNode(block=[BinaryOperatorNode(left=NumberNode(value=2), operator='+', right=NumberNode(value=2))])),
+        ("2 + 3 * 4 / 5 ^ 6",
+         [NumberToken(value=2, position=0), BinaryOperatorToken(value='+', position=2), NumberToken(value=3, position=4), BinaryOperatorToken(value='*', position=6), NumberToken(value=4, position=8), BinaryOperatorToken(value='/', position=10), NumberToken(value=5, position=12), BinaryOperatorToken(value='^', position=14), NumberToken(value=6, position=16)],
+                BlockNode(block=[BinaryOperatorNode(left=NumberNode(value=2), operator='+', right=BinaryOperatorNode(left=BinaryOperatorNode(left=NumberNode(value=3), operator='*', right=NumberNode(value=4)), operator='/', right=BinaryOperatorNode(left=NumberNode(value=5), operator='^', right=NumberNode(value=6))))])),
+        ("x = 5 % 51",
+         [VariableToken(value='x', position=0), AssignToken(value='=', position=2), NumberToken(value=5, position=4), BinaryOperatorToken(value='%', position=6), NumberToken(value=51, position=8)],
+         BlockNode(block=[AssignNode(variable=VariableNode(value='x'), operator='=', right=BinaryOperatorNode(left=NumberNode(value=5), operator='%', right=NumberNode(value=51)))])),
+        ("return x >= 10",
+         [ReturnToken(value='return', position=0), VariableToken(value='x', position=7), BinaryOperatorToken(value='>=', position=9), NumberToken(value=10, position=12)],
+         BlockNode(block=[ReturnNode(expression=BinaryOperatorNode(left=VariableNode(value='x'), operator='>=', right=NumberNode(value=10)))])),
+        ("return x <= 10",
+         [ReturnToken(value='return', position=0), VariableToken(value='x', position=7), BinaryOperatorToken(value='<=', position=10), NumberToken(value=10, position=13)],
+         BlockNode(block=[ReturnNode(expression=BinaryOperatorNode(left=VariableNode(value='x'), operator='<=', right=NumberNode(value=10)))])),
+        ("return x > 10",
+         [ReturnToken(value='return', position=0), VariableToken(value='x', position=7), BinaryOperatorToken(value='>', position=9), NumberToken(value=10, position=11)],
+         BlockNode(block=[ReturnNode(expression=BinaryOperatorNode(left=VariableNode(value='x'), operator='>', right=NumberNode(value=10)))])),
+        ("return x < 10",
+         [ReturnToken(value='return', position=0), VariableToken(value='x', position=7), BinaryOperatorToken(value='<', position=9), NumberToken(value=10, position=11)],
+         BlockNode(block=[ReturnNode(expression=BinaryOperatorNode(left=VariableNode(value='x'), operator='<', right=NumberNode(value=10)))])),
+        ("return x == 10",
+         [ReturnToken(value='return', position=0), VariableToken(value='x', position=7), BinaryOperatorToken(value='==', position=9), NumberToken(value=10, position=12)],
+         BlockNode(block=[ReturnNode(expression=BinaryOperatorNode(left=VariableNode(value='x'), operator='==', right=NumberNode(value=10)))])),
+        ("-123",
+         [BinaryOperatorToken(value='-', position=0), NumberToken(value=123, position=1)],
+         BlockNode(block=[UnaryMinusNode(operand=NumberNode(value=123))])),
+        ("x = 5 y = 10 if x > y {return x + y} else {return x - y}",
+         [VariableToken(value='x', position=0), AssignToken(value='=', position=2), NumberToken(value=5, position=4), VariableToken(value='y', position=6), AssignToken(value='=', position=8), NumberToken(value=10, position=10), IfToken(value='if', position=13), VariableToken(value='x', position=16), BinaryOperatorToken(value='>', position=18), VariableToken(value='y', position=20), OpeningBraceToken(value='{', position=22), ReturnToken(value='return', position=23), VariableToken(value='x', position=30), BinaryOperatorToken(value='+', position=32), VariableToken(value='y', position=34), ClosingBraceToken(value='}', position=35), ElseToken(value='else', position=37), OpeningBraceToken(value='{', position=42), ReturnToken(value='return', position=43), VariableToken(value='x', position=50), BinaryOperatorToken(value='-', position=52), VariableToken(value='y', position=54), ClosingBraceToken(value='}', position=55)],
+         BlockNode(block=[AssignNode(variable=VariableNode(value='x'), operator='=', right=NumberNode(value=5)), AssignNode(variable=VariableNode(value='y'), operator='=', right=NumberNode(value=10)), IfNode(condition=BinaryOperatorNode(left=VariableNode(value='x'), operator='>', right=VariableNode(value='y')), body=BlockNode(block=[ReturnNode(expression=BinaryOperatorNode(left=VariableNode(value='x'), operator='+', right=VariableNode(value='y')))]), else_body=BlockNode(block=[ReturnNode(expression=BinaryOperatorNode(left=VariableNode(value='x'), operator='-', right=VariableNode(value='y')))]))])),
+        ("function func(x) {while x > 100 {x = x + 1} return x}",
+         [FunctionToken(value='function', position=0), VariableToken(value='func', position=9), OpeningParenthesisToken(value='(', position=13), VariableToken(value='x', position=14), ClosingParenthesisToken(value=')', position=15), OpeningBraceToken(value='{', position=17), WhileToken(value='while', position=18), VariableToken(value='x', position=24), BinaryOperatorToken(value='>', position=26), NumberToken(value=100, position=28), OpeningBraceToken(value='{', position=32), VariableToken(value='x', position=33), AssignToken(value='=', position=35), VariableToken(value='x', position=37), BinaryOperatorToken(value='+', position=39), NumberToken(value=1, position=41), ClosingBraceToken(value='}', position=42), ReturnToken(value='return', position=44), VariableToken(value='x', position=51), ClosingBraceToken(value='}', position=52)],
+         BlockNode(block=[FunctionNode(name='func', args=[VariableNode(value='x')], body=BlockNode(block=[WhileNode(condition=BinaryOperatorNode(left=VariableNode(value='x'), operator='>', right=NumberNode(value=100)), body=BlockNode(block=[AssignNode(variable=VariableNode(value='x'), operator='=', right=BinaryOperatorNode(left=VariableNode(value='x'), operator='+', right=NumberNode(value=1)))]), else_body=None), ReturnNode(expression=VariableNode(value='x'))]))])),
+        ("функция функ(б) {пока б > 100 {б = б + 1} вернуть б}",
+         [FunctionToken(value='функция', position=0), VariableToken(value='функ', position=8), OpeningParenthesisToken(value='(', position=12), VariableToken(value='б', position=13), ClosingParenthesisToken(value=')', position=14), OpeningBraceToken(value='{', position=16), WhileToken(value='пока', position=17), VariableToken(value='б', position=22), BinaryOperatorToken(value='>', position=24), NumberToken(value=100, position=26), OpeningBraceToken(value='{', position=30), VariableToken(value='б', position=31), AssignToken(value='=', position=33), VariableToken(value='б', position=35), BinaryOperatorToken(value='+', position=37), NumberToken(value=1, position=39), ClosingBraceToken(value='}', position=40), ReturnToken(value='вернуть', position=42), VariableToken(value='б', position=50), ClosingBraceToken(value='}', position=51)],
+         BlockNode(block=[FunctionNode(name='функ', args=[VariableNode(value='б')], body=BlockNode(block=[WhileNode(condition=BinaryOperatorNode(left=VariableNode(value='б'), operator='>', right=NumberNode(value=100)), body=BlockNode(block=[AssignNode(variable=VariableNode(value='б'), operator='=', right=BinaryOperatorNode(left=VariableNode(value='б'), operator='+', right=NumberNode(value=1)))]), else_body=None), ReturnNode(expression=VariableNode(value='б'))]))])),
+        ("(2 + 3)",
+         [OpeningParenthesisToken(value='(', position=0), NumberToken(value=2, position=1), BinaryOperatorToken(value='+', position=3), NumberToken(value=3, position=5), ClosingParenthesisToken(value=')', position=6)],
+         BlockNode(block=[BinaryOperatorNode(left=NumberNode(value=2), operator='+', right=NumberNode(value=3))])),
+        ("ч = 500 я = 1000 если ч > 0 {if я > 0 {вернуть ч}}", [VariableToken(value='ч', position=0), AssignToken(value='=', position=2), NumberToken(value=500, position=4), VariableToken(value='я', position=8), AssignToken(value='=', position=10), NumberToken(value=1000, position=12), IfToken(value='если', position=17), VariableToken(value='ч', position=22), BinaryOperatorToken(value='>', position=24), NumberToken(value=0, position=26), OpeningBraceToken(value='{', position=28), IfToken(value='if', position=29), VariableToken(value='я', position=32), BinaryOperatorToken(value='>', position=34), NumberToken(value=0, position=36), OpeningBraceToken(value='{', position=38), ReturnToken(value='вернуть', position=39), VariableToken(value='ч', position=47), ClosingBraceToken(value='}', position=48), ClosingBraceToken(value='}', position=49)],
+         BlockNode(block=[AssignNode(variable=VariableNode(value='ч'), operator='=', right=NumberNode(value=500)), AssignNode(variable=VariableNode(value='я'), operator='=', right=NumberNode(value=1000)), IfNode(condition=BinaryOperatorNode(left=VariableNode(value='ч'), operator='>', right=NumberNode(value=0)), body=BlockNode(block=[IfNode(condition=BinaryOperatorNode(left=VariableNode(value='я'), operator='>', right=NumberNode(value=0)), body=BlockNode(block=[ReturnNode(expression=VariableNode(value='ч'))]), else_body=None)]), else_body=None)])),
+        ("3.14",
+         [NumberToken(value=3.14, position=0)],
+         BlockNode(block=[NumberNode(value=3.14)])),
+        ("приветребята = 0 пока приветребята < 100 {приветребята = приветребята + 1}",
+         [VariableToken(value='приветребята', position=0), AssignToken(value='=', position=13), NumberToken(value=0, position=15), WhileToken(value='пока', position=17), VariableToken(value='приветребята', position=22), BinaryOperatorToken(value='<', position=35), NumberToken(value=100, position=37), OpeningBraceToken(value='{', position=41), VariableToken(value='приветребята', position=42), AssignToken(value='=', position=55), VariableToken(value='приветребята', position=57), BinaryOperatorToken(value='+', position=70), NumberToken(value=1, position=72), ClosingBraceToken(value='}', position=73)],
+         BlockNode(block=[AssignNode(variable=VariableNode(value='приветребята'), operator='=', right=NumberNode(value=0)), WhileNode(condition=BinaryOperatorNode(left=VariableNode(value='приветребята'), operator='<', right=NumberNode(value=100)), body=BlockNode(block=[AssignNode(variable=VariableNode(value='приветребята'), operator='=', right=BinaryOperatorNode(left=VariableNode(value='приветребята'), operator='+', right=NumberNode(value=1)))]), else_body=None)])),
+        ("-(2 + 2)",
+         [BinaryOperatorToken(value='-', position=0), OpeningParenthesisToken(value='(', position=1), NumberToken(value=2, position=2), BinaryOperatorToken(value='+', position=4), NumberToken(value=2, position=6), ClosingParenthesisToken(value=')', position=7)],
+         BlockNode(block=[UnaryMinusNode(operand=BinaryOperatorNode(left=NumberNode(value=2), operator='+', right=NumberNode(value=2)))])),
+        ("x = 500 y = func(x)",
+         [VariableToken(value='x', position=0), AssignToken(value='=', position=2), NumberToken(value=500, position=4), VariableToken(value='y', position=8), AssignToken(value='=', position=10), VariableToken(value='func', position=12), OpeningParenthesisToken(value='(', position=16), VariableToken(value='x', position=17), ClosingParenthesisToken(value=')', position=18)],
+         BlockNode(block=[AssignNode(variable=VariableNode(value='x'), operator='=', right=NumberNode(value=500)), AssignNode(variable=VariableNode(value='y'), operator='=', right=CallNode(name='func', args=[VariableNode(value='x')]))])),
+        ("print(2 + 2, x)",
+         [VariableToken(value='print', position=0), OpeningParenthesisToken(value='(', position=5), NumberToken(value=2, position=6), BinaryOperatorToken(value='+', position=8), NumberToken(value=2, position=10), ContinueArgsToken(value=',', position=11), VariableToken(value='x', position=13), ClosingParenthesisToken(value=')', position=14)],
+         BlockNode(block=[CallNode(name='print', args=[BinaryOperatorNode(left=NumberNode(value=2), operator='+', right=NumberNode(value=2)), VariableNode(value='x')])])),
+        ("-2 ^ 3",
+         [BinaryOperatorToken(value='-', position=0), NumberToken(value=2, position=1), BinaryOperatorToken(value='^', position=3), NumberToken(value=3, position=5)],
+         BlockNode(block=[UnaryMinusNode(operand=BinaryOperatorNode(left=NumberNode(value=2), operator='^', right=NumberNode(value=3)))])),
+        ("print(func(x))",
+         [VariableToken(value='print', position=0), OpeningParenthesisToken(value='(', position=5), VariableToken(value='func', position=6), OpeningParenthesisToken(value='(', position=10), VariableToken(value='x', position=11), ClosingParenthesisToken(value=')', position=12), ClosingParenthesisToken(value=')', position=13)],
+         BlockNode(block=[CallNode(name='print', args=[CallNode(name='func', args=[VariableNode(value='x')])])])),
+
+    ]
+)
+def test_parser(source, tokens, expected, memory=None):
+    if memory is None:
+        memory = {}
+    assert parse(tokens, source, memory) == expected
