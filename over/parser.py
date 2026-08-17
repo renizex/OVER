@@ -214,7 +214,7 @@ class Parser:
 
     def parse_call(self) -> nodes.Node:
         current = self.current()
-        if current is not None and isinstance(self.next_token(), tokens.OpeningParenthesisToken):
+        if current is not None and self.current != '(' and self.next_token() == '(':
             args: list[nodes.Node] = []
             self.advance()
             self.expect('(')
@@ -242,9 +242,9 @@ class Parser:
                 self.advance()
                 return variable
             case tokens.OpeningParenthesisToken():
-                self.advance()
+                self.consume('(')
                 node = self.parse_expression()
-                if self.expect(')'):
+                while self.match(')'):
                     self.advance()
                     return node
                 self.error(f"ERROR: expected closing parenthesis at position {self.current_index + 1}.")
