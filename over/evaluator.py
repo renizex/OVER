@@ -79,7 +79,9 @@ def evaluate(node: nodes.Node, memory: Memory | Scope, functions: dict[str, node
             try:
                 call_stack.append(node.name)
                 arguments = [evaluate(arg, memory, functions) for arg in node.args]
-                variables = [var.value for var in functions[node.name].args]
+                if node.name.value not in functions:
+                    raise InvalidExpressionError(f"ERROR: function '{node.name.value}' does not exist.")
+                variables = [var.value for var in functions[node.name.value].args]
                 body = functions[node.name].body
                 try:
                     local_memory = dict(zip(variables, arguments, strict=True))

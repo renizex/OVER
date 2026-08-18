@@ -4,22 +4,19 @@ import over.nodes as nodes
 from over.exceptions import InvalidExpressionError
 
 
-def parse(tokens_list: list[tokens.Token], expression: str, functions: dict[str, nodes.FunctionNode]) -> nodes.Node:
-    parser = Parser(tokens_list, expression, functions)
+def parse(tokens_list: list[tokens.Token], expression: str) -> nodes.Node:
+    parser = Parser(tokens_list, expression)
     node = parser.parse_program()
     return node
 
 class Parser:
-    def __init__(self, tokens_list: list[tokens.Token], expression: str, functions) -> None:
+    def __init__(self, tokens_list: list[tokens.Token], expression: str) -> None:
         self.tokens_list = tokens_list
         self.expression = expression
         self.current_index = 0
         self.count_statements = 0
-        self.count_power = 0
-        self.functions = functions
 
     def current(self) -> tokens.Token | None:
-        #print(self.current_index, len(self.tokens))
         if self.current_index >= len(self.tokens_list):
             return None
         return self.tokens_list[self.current_index]
@@ -36,9 +33,9 @@ class Parser:
         current = self.current()
         previous = self.previous()
         if current is not None:
-            pointer = ' ' * current.position + '^' if self.current_index else '^'
+            pointer = ' ' * current.position + '^'
         elif previous is not None:
-            pointer = ' ' * previous.position + '^' if self.current_index else '^'
+            pointer = ' ' * previous.position + '^'
         else:
             pointer = '^'
         raise InvalidExpressionError(
@@ -51,27 +48,22 @@ class Parser:
         current = self.current()
         return current is not None and current.value in values
 
-    def consume(self, *values: str) -> str | None:
+    def expect(self, *values) -> str:
         current = self.current()
-        if current is None:
-            return None
-        if current.value not in values:
-            return None
-        self.advance()
-        return current.value
-
-    def expect(self, *args) -> bool:
-        current = self.current()
+        if "IDENTIFIER" in values:
+            if not isinstance(current, tokens.VariableToken):
+                self.error(f"ERROR: expected identifier, got '{current}'.")
+            return current.value
         if current is not None:
-            if current.value in args:
-                return True
-            self.error(f"ERROR: expected {args}, got '{current.value}'.")
-        self.error(f"ERROR: expected {args}, got 'none.")
+            if current.value in values:
+                return current.value
+            self.error(f"ERROR: expected {values}, got '{current.value}'.")
+        self.error(f"ERROR: expected {values}, got 'None'.")
 
-    def next_token(self) -> tokens.Token | None:
-        if self.current_index >= len(self.tokens_list) - 1:
-            return None
-        return self.tokens_list[self.current_index + 1]
+    def consume(self, *values: str) -> str:
+        current = self.expect(*values)
+        self.advance()
+        return current
 
     def parse_program(self) -> nodes.Node:
         node_list: list[nodes.Node] = []
@@ -103,31 +95,31 @@ class Parser:
     def parse_if_statement(self) -> nodes.Node:
         condition = self.parse_expression()
         body = self.parse_block()
-        if self.consume('else') is None:
+        if not self.match('else'):
             return nodes.IfNode(condition, body, None)
+        self.advance()
         else_body = self.parse_block()
         return nodes.IfNode(condition, body, else_body)
 
     def parse_while_statement(self) -> nodes.Node:
         condition = self.parse_expression()
         body = self.parse_block()
-        if self.consume('else') is None:
+        if not self.match('else'):
             return nodes.WhileNode(condition, body, None)
+        self.advance()
         else_body = self.parse_block()
         return nodes.WhileNode(condition, body, else_body)
 
     def parse_function(self) -> nodes.Node:
-        args = []
-        name = self.current().value
-        self.advance()
-        self.expect('(')
-        self.advance()
-        args.append(self.parse_expression())
-        while self.match(','):
-            self.advance()
+        args: list[nodes.Node] = []
+        name = self.consume('IDENTIFIER')
+        self.consume('(')
+        if not self.match(')'):
             args.append(self.parse_expression())
-        self.expect(')')
-        self.advance()
+            while self.match(','):
+                self.advance()
+                args.append(self.parse_expression())
+        self.consume(')')
         body = self.parse_block()
         return nodes.FunctionNode(name, args, body)
 
@@ -137,8 +129,7 @@ class Parser:
 
     def parse_block(self) -> nodes.BlockNode:
         block: list[nodes.Node] = []
-        if self.consume('{') is None:
-            self.error(f"ERROR: expected '{'{'}', got 'None'.")
+        self.consume('{')
         while True:
             current = self.current()
             if current is None:
@@ -151,42 +142,34 @@ class Parser:
 
     def parse_assignment(self) -> nodes.Node:
         variable = self.parse_expression()
-        while True:
+        if self.match('=') and not isinstance(variable, nodes.VariableNode):
+            self.error(f"ERROR: expected a variable, got '{variable}'.")
+        if self.match('='):
             operator = self.consume('=')
-            if operator is None:
-                break
-            if not isinstance(variable, nodes.VariableNode):
-                self.error(f"ERROR: expected a variable, got '{variable}'.")
             right = self.parse_expression()
             variable = nodes.AssignNode(variable, operator, right)
         return variable
 
     def parse_expression(self) -> nodes.Node:
         left = self.parse_comparison()
-        while True:
+        while self.match('+', '-'):
             operator = self.consume('+', '-')
-            if operator is None:
-                break
             right = self.parse_comparison()
             left = nodes.BinaryOperatorNode(left, operator, right)
         return left
 
     def parse_comparison(self) -> nodes.Node:
         left = self.parse_term()
-        while True:
+        if self.match('>', '<', '==', '<=', '>='):
             operator = self.consume( '>', '<', '==', '<=', '>=')
-            if operator is None:
-                break
             right = self.parse_term()
             left = nodes.BinaryOperatorNode(left, operator, right)
         return left
 
     def parse_term(self) -> nodes.Node:
         left = self.parse_unary()
-        while True:
+        while self.match('*', '/', '%'):
             operator = self.consume('*', '/', '%')
-            if operator is None:
-                break
             right = self.parse_unary()
             left = nodes.BinaryOperatorNode(left, operator, right)
         return left
@@ -199,34 +182,26 @@ class Parser:
         return self.parse_power()
 
     def parse_power(self) -> nodes.Node:
-        max_power = 1000
         left = self.parse_call()
-        while True:
+        if self.match('^'):
             operator = self.consume('^')
-            if operator is None:
-                break
-            self.count_power += 1
-            if self.count_power > max_power:
-                raise InvalidExpressionError(f"ERROR: power expression is too deep.")
             right = self.parse_power()
             left = nodes.BinaryOperatorNode(left, operator, right)
         return left
 
     def parse_call(self) -> nodes.Node:
-        current = self.current()
-        if current is not None and self.current != '(' and self.next_token() == '(':
+        func = self.parse_factor()
+        while self.match('('):
+            self.consume('(')
             args: list[nodes.Node] = []
-            self.advance()
-            self.expect('(')
-            self.advance()
-            args.append(self.parse_expression())
-            while self.match(','):
-                self.advance()
+            if not self.match(')'):
                 args.append(self.parse_expression())
-            self.expect(')')
-            self.advance()
-            return nodes.CallNode(current.value, args)
-        return self.parse_factor()
+                while self.match(','):
+                    self.consume(',')
+                    args.append(self.parse_expression())
+            self.consume(')')
+            func = nodes.CallNode(func, args)
+        return func
 
     def parse_factor(self) -> nodes.Node:
         current = self.current()
@@ -244,8 +219,6 @@ class Parser:
             case tokens.OpeningParenthesisToken():
                 self.consume('(')
                 node = self.parse_expression()
-                while self.match(')'):
-                    self.advance()
-                    return node
-                self.error(f"ERROR: expected closing parenthesis at position {self.current_index + 1}.")
-        self.error(f"ERROR: unexpected token '{current.value}' at position {self.current_index + 1}.")
+                self.consume(')')
+                return node
+        self.error(f"ERROR: unexpected token '{current.value}' at position {current.position}.")

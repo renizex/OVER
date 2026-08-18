@@ -59,7 +59,7 @@ def main() -> None:
             if check_expression(expression, memory):
                 continue
             tokens = lex(expression)
-            node = parse(tokens, expression, functions)
+            node = parse(tokens, expression)
             output = evaluate(node, memory, functions)
             if output is None:
                 continue

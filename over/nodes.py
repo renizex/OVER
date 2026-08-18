@@ -53,7 +53,7 @@ class FunctionNode(Node):
 
 @dataclass
 class CallNode(Node):
-    name: str
+    name: VariableNode
     args: list[Node]
 
 @dataclass
