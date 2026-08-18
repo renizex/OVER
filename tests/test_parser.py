@@ -58,20 +58,18 @@ from over.tokens import *
          BlockNode(block=[UnaryMinusNode(operand=BinaryOperatorNode(left=NumberNode(value=2), operator='+', right=NumberNode(value=2)))])),
         ("x = 500 y = func(x)",
          [VariableToken(value='x', position=0), AssignToken(value='=', position=2), NumberToken(value=500, position=4), VariableToken(value='y', position=8), AssignToken(value='=', position=10), VariableToken(value='func', position=12), OpeningParenthesisToken(value='(', position=16), VariableToken(value='x', position=17), ClosingParenthesisToken(value=')', position=18)],
-         BlockNode(block=[AssignNode(variable=VariableNode(value='x'), operator='=', right=NumberNode(value=500)), AssignNode(variable=VariableNode(value='y'), operator='=', right=CallNode(name='func', args=[VariableNode(value='x')]))])),
+         BlockNode(block=[AssignNode(variable=VariableNode(value='x'), operator='=', right=NumberNode(value=500)), AssignNode(variable=VariableNode(value='y'), operator='=', right=CallNode(name=VariableNode(value='func'), args=[VariableNode(value='x')]))])),
         ("print(2 + 2, x)",
          [VariableToken(value='print', position=0), OpeningParenthesisToken(value='(', position=5), NumberToken(value=2, position=6), BinaryOperatorToken(value='+', position=8), NumberToken(value=2, position=10), ContinueArgsToken(value=',', position=11), VariableToken(value='x', position=13), ClosingParenthesisToken(value=')', position=14)],
-         BlockNode(block=[CallNode(name='print', args=[BinaryOperatorNode(left=NumberNode(value=2), operator='+', right=NumberNode(value=2)), VariableNode(value='x')])])),
+         BlockNode(block=[CallNode(name=VariableNode(value='print'), args=[BinaryOperatorNode(left=NumberNode(value=2), operator='+', right=NumberNode(value=2)), VariableNode(value='x')])])),
         ("-2 ^ 3",
          [BinaryOperatorToken(value='-', position=0), NumberToken(value=2, position=1), BinaryOperatorToken(value='^', position=3), NumberToken(value=3, position=5)],
          BlockNode(block=[UnaryMinusNode(operand=BinaryOperatorNode(left=NumberNode(value=2), operator='^', right=NumberNode(value=3)))])),
         ("print(func(x))",
          [VariableToken(value='print', position=0), OpeningParenthesisToken(value='(', position=5), VariableToken(value='func', position=6), OpeningParenthesisToken(value='(', position=10), VariableToken(value='x', position=11), ClosingParenthesisToken(value=')', position=12), ClosingParenthesisToken(value=')', position=13)],
-         BlockNode(block=[CallNode(name='print', args=[CallNode(name='func', args=[VariableNode(value='x')])])])),
+         BlockNode(block=[CallNode(name=VariableNode('print'), args=[CallNode(name=VariableNode('func'), args=[VariableNode(value='x')])])])),
 
     ]
 )
 def test_parser(source, tokens, expected, memory=None):
-    if memory is None:
-        memory = {}
-    assert parse(tokens, source, memory) == expected
+    assert parse(tokens, source) == expected
