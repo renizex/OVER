@@ -68,8 +68,7 @@ from over.tokens import *
         ("print(func(x))",
          [VariableToken(value='print', position=0), OpeningParenthesisToken(value='(', position=5), VariableToken(value='func', position=6), OpeningParenthesisToken(value='(', position=10), VariableToken(value='x', position=11), ClosingParenthesisToken(value=')', position=12), ClosingParenthesisToken(value=')', position=13)],
          BlockNode(block=[CallNode(name=VariableNode('print'), args=[CallNode(name=VariableNode('func'), args=[VariableNode(value='x')])])])),
-
     ]
 )
-def test_parser(source, tokens, expected, memory=None):
+def test_parser(source, tokens, expected):
     assert parse(tokens, source) == expected
