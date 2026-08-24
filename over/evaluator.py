@@ -27,7 +27,6 @@ class Scope:
 evaluator = Evaluator()
 
 def evaluate(node: nodes.Node, memory: Memory | Scope, functions: dict[str, nodes.FunctionNode]) -> Number | None:
-    call_stack = []
     max_cycles = 10000
     match node:
         case nodes.AssignNode():
@@ -76,24 +75,24 @@ def evaluate(node: nodes.Node, memory: Memory | Scope, functions: dict[str, node
             functions[node.name] = node
             return None
         case nodes.CallNode():
+            arguments = [evaluate(arg, memory, functions) for arg in node.args]
+            function = resolve_function(node, functions)
+            if isinstance(function, nodes.BuiltinCallNode):
+                builtins[function.name](*arguments)
+                return None
+            variables = [var.value for var in functions[function.name].args]
+            if not isinstance(node.name, nodes.VariableNode):
+                raise InvalidExpressionError(f"ERROR: ты написал хуйню")
+            body = functions[function.name].body
             try:
-                call_stack.append(node.name)
-                arguments = [evaluate(arg, memory, functions) for arg in node.args]
-                if node.name.value not in functions:
-                    raise InvalidExpressionError(f"ERROR: function '{node.name.value}' does not exist.")
-                variables = [var.value for var in functions[node.name.value].args]
-                body = functions[node.name].body
-                try:
-                    local_memory = dict(zip(variables, arguments, strict=True))
-                except ValueError:
-                    raise InvalidExpressionError(f"ERROR: expected {len(variables)} arguments, got {len(arguments)}.")
-                scope = Scope(local_memory, memory)
-                try:
-                    return evaluate(body, scope, functions)
-                except ReturnStatement as result:
-                    return result.expression
-            finally:
-                call_stack.pop()
+                local_memory = dict(zip(variables, arguments, strict=True))
+            except ValueError:
+                raise InvalidExpressionError(f"ERROR: expected {len(variables)} arguments, got {len(arguments)}.")
+            scope = Scope(local_memory, memory)
+            try:
+                return evaluate(body, scope, functions)
+            except ReturnStatement as result:
+                return result.expression
         case nodes.ReturnNode():
             result = None
             if node.expression is not None:
@@ -123,3 +122,14 @@ def resolve_operand(node: nodes.Node, memory: Memory | Scope) -> Number:
             raise InvalidExpressionError(f"ERROR: variable '{variable}' does not exist.")
         case _:
             raise InvalidExpressionError(f"ERROR: can't resolve operand for type '{type(node).__name__}'.")
+
+builtins = {
+    "print": print,
+}
+
+def resolve_function(node: nodes.CallNode, functions: dict[str, nodes.FunctionNode]) -> nodes.BuiltinCallNode | nodes.UserCallNode:
+    if node.name.value in builtins:
+        return nodes.BuiltinCallNode(node.name.value, node.args)
+    elif node.name.value not in functions:
+        raise InvalidExpressionError(f"ERROR: function '{node.name.value}' does not exist.")
+    return nodes.UserCallNode(node.name.value, node.args)

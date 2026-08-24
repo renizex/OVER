@@ -59,3 +59,13 @@ class CallNode(Node):
 @dataclass
 class ReturnNode(Node):
     expression: Node | None
+
+@dataclass
+class BuiltinCallNode(Node):
+    name: str
+    args: list[Node]
+
+@dataclass
+class UserCallNode(Node):
+    name: str
+    args: list[Node]

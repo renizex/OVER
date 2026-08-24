@@ -1,5 +1,5 @@
 from over.typing_utils import Number, Memory
-from over.exceptions import InvalidExpressionError, ReturnStatement
+from over.exceptions import InvalidExpressionError
 from over.lexer import lex
 from over.parser import parse
 from over.evaluator import evaluate
@@ -60,14 +60,11 @@ def main() -> None:
                 continue
             tokens = lex(expression)
             node = parse(tokens, expression)
-            output = evaluate(node, memory, functions)
-            if output is None:
-                continue
-            print(output)
+            result = evaluate(node, memory, functions)
+            if result is not None:
+                raise InvalidExpressionError(f"ERROR: this expression is invalid.\nuse 'print({expression})'.")
         except InvalidExpressionError as msg:
             print(msg)
-        except ReturnStatement as msg:
-            print(msg.expression)
 
 def check_expression(expression: str, memory: Memory) -> bool:
     if is_command(expression, memory):
