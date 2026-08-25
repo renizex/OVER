@@ -14,7 +14,7 @@ root.grid_rowconfigure(0, weight=1)
 
 from over.lexer import lex
 from over.parser import parse
-from over.evaluator import evaluate
+from over.interpreter import interpret
 from over.exceptions import InvalidExpressionError, ReturnStatement
 
 
@@ -35,7 +35,7 @@ def run(*_):
         txt = text.get("1.0", "end-1c")
         tokens = lex(txt)
         node = parse(tokens, txt)
-        result = evaluate(node, ide.memory, ide.functions)
+        result = interpret(node)
         if result is not None:
             console_text.insert("1.0", str(result))
         console_frame.grid(column=0, row=2, sticky="nsew", padx=10, pady=10)

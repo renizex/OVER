@@ -95,7 +95,7 @@ class Parser:
     def parse_if_statement(self) -> nodes.Node:
         condition = self.parse_expression()
         body = self.parse_block()
-        if not self.match('else'):
+        if not self.match('else', 'иначе'):
             return nodes.IfNode(condition, body, None)
         self.advance()
         else_body = self.parse_block()
@@ -104,7 +104,7 @@ class Parser:
     def parse_while_statement(self) -> nodes.Node:
         condition = self.parse_expression()
         body = self.parse_block()
-        if not self.match('else'):
+        if not self.match('else', 'иначе'):
             return nodes.WhileNode(condition, body, None)
         self.advance()
         else_body = self.parse_block()
