@@ -68,7 +68,7 @@ from over.exceptions import InvalidLexemeError
         """, [IfToken(value='if', position=9), VariableToken(value='x', position=12), BinaryOperatorToken(value='>', position=14), NumberToken(value=0, position=16), OpeningBraceToken(value='{', position=18), ReturnToken(value='return', position=32), VariableToken(value='x', position=39), ClosingBraceToken(value='}', position=53)])
     ]
 )
-def test_lex(source, expected):
+def test_lexer(source, expected):
     assert lex(source) == expected
 
 @pytest.mark.parametrize(
