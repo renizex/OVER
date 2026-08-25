@@ -4,9 +4,9 @@ from over.exceptions import InvalidExpressionError, ReturnStatement
 import over.operators as operators
 from over.builtins import builtins
 
-def interpret(node):
+def interpret(node) -> Number | None:
     evaluator = Evaluator()
-    evaluator.evaluate(node)
+    return evaluator.evaluate(node)
 
 class Evaluator:
     def __init__(self):
@@ -30,7 +30,7 @@ class Evaluator:
     def unary_minus_node(self, node) -> Number | None:
         value = self.evaluate(node.operand)
         if value is None:
-            raise InvalidExpressionError(f"ERROR: expected number, got type None.")
+            raise InvalidExpressionError(f"ERROR: expected number, got type 'None'.")
         return operators.unary_minus(value)
 
     def binary_operator_node(self, node) -> Number | None:
@@ -74,14 +74,14 @@ class Evaluator:
         return previous_scope
 
     def call_node(self, node) -> Number | None:
+        if not isinstance(node.name, nodes.VariableNode):
+            raise InvalidExpressionError(f"ERROR: invalid function call '{node.name.value}'.")
         arguments = [self.evaluate(arg) for arg in node.args]
         function = self.resolve_function(node)
         if isinstance(function, nodes.BuiltinCallNode):
             builtins[function.name](*arguments)
             return None
         variables = [var.value for var in self.functions[function.name].args]
-        if not isinstance(node.name, nodes.VariableNode):
-            raise InvalidExpressionError(f"ERROR: invalid function call '{node.name.value}'.")
         body = self.functions[function.name].body
         previous_scope = self.create_scope(variables, arguments)
         try:
@@ -124,7 +124,7 @@ class Evaluator:
         self.scope[node.variable.value] = value
         return None
 
-    def resolve_operand(self, node: nodes.Node) -> Number:
+    def resolve_operand(self, node: nodes.NumberNode | nodes.VariableNode) -> Number:
         match node:
             case nodes.NumberNode():
                 return node.value
@@ -132,8 +132,6 @@ class Evaluator:
                 if variable in self.scope:
                     return self.scope[variable]
                 raise InvalidExpressionError(f"ERROR: variable '{variable}' does not exist.")
-            case _:
-                raise InvalidExpressionError(f"ERROR: can't resolve operand for type '{type(node).__name__}'.")
 
     def resolve_function(self, node: nodes.CallNode) -> nodes.BuiltinCallNode | nodes.UserCallNode:
         if node.name.value in builtins:
