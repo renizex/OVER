@@ -10,19 +10,19 @@ def lex(expression: str) -> list[tokens.Token]:
         if match.group(1):
             raw_number = match.group(1)
             number = float(raw_number) if '.' in raw_number else int(raw_number)
-            tokens_list.append(tokens.NumberToken(number, match.start()))
+            tokens_list.append(tokens.NumberToken(number, match.start(), match.end()))
         elif match.group(2):
             variable = match.group(2)
             if variable in keywords:
-                tokens_list.append(keywords[variable](variable, match.start()))
+                tokens_list.append(keywords[variable](variable, match.start(), match.end()))
             else:
-                tokens_list.append(tokens.VariableToken(variable, match.start()))
+                tokens_list.append(tokens.VariableToken(variable, match.start(), match.end()))
         elif match.group(3):
             operator = match.group(3)
             if operator in special_operators:
-                tokens_list.append(special_operators[operator](operator, match.start()))
+                tokens_list.append(special_operators[operator](operator, match.start(), match.end()))
             else:
-                tokens_list.append(tokens.BinaryOperatorToken(operator, match.start()))
+                tokens_list.append(tokens.BinaryOperatorToken(operator, match.start(), match.end()))
         elif match.group(4):
             pass
         elif match.group(5):

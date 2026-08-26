@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 from over.typing_utils import Number
 
-@dataclass
+@dataclass(kw_only=True)
 class Node:
-    pass
+    position: int
+    end: int
 
 @dataclass
 class BinaryOperatorNode(Node):

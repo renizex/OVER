@@ -5,6 +5,7 @@ from over.typing_utils import Number
 class Token:
     value: str
     position: int
+    end: int
 
 @dataclass
 class BinaryOperatorToken(Token):

@@ -50,7 +50,7 @@ def main() -> None:
                 continue
             tokens = lex(expression)
             node = parse(tokens, expression)
-            result = interpret(node)
+            result = interpret(node, expression)
             if result is not None:
                 raise InvalidExpressionError(f"ERROR: this expression is invalid.\nuse 'print({expression})'.")
         except InvalidExpressionError as msg:
