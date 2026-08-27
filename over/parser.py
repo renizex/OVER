@@ -129,17 +129,22 @@ class Parser:
 
     def parse_block(self) -> nodes.BlockNode:
         block: list[nodes.Node] = []
-        self.consume('{')
+        if not self.match('{'):
+            self.expect('{')
+        start = self.current().position
+        self.advance()
         while True:
             current = self.current()
             if current is None:
-                self.error(f"ERROR: expected {'}'}, got 'None'")
+                self.error(f"ERROR: expected {'}'}, got 'None'.")
             if current.value == '}':
                 break
             block.append(self.parse_statement())
-        self.consume('}')
-        node = block[-1]
-        return nodes.BlockNode(block, position=node.position, end=node.end)
+        if not self.match('}'):
+            self.expect('}')
+        end = self.current().end
+        self.advance()
+        return nodes.BlockNode(block, position=start, end=end)
 
     def parse_assignment(self) -> nodes.Node:
         variable = self.parse_expression()
