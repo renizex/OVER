@@ -28,15 +28,12 @@ class Parser:
     def advance(self) -> None:
         self.current_index += 1
 
-    def error(self, message: str) -> NoReturn:
-        current = self.current()
-        previous = self.previous()
-        if current is not None:
-            pointer = ' ' * current.position + '^'
-        elif previous is not None:
-            pointer = ' ' * previous.position + '^'
+    def error(self, message: str, target: tokens.Token | None | nodes.Node) -> NoReturn:
+        if target is None:
+            position = len(self.expression)
+            pointer = ' ' * position + '^'
         else:
-            pointer = '^'
+            pointer = ' ' * target.position + '^' * (target.end - target.position)
         raise InvalidExpressionError(
             f"      {message}\n"
             f"      {self.expression}\n"
@@ -51,20 +48,20 @@ class Parser:
         current = self.current()
         if "IDENTIFIER" in values:
             if not isinstance(current, tokens.VariableToken):
-                self.error(f"ERROR: expected identifier, got '{current}'.")
+                self.error(f"ERROR: expected identifier, got '{current}'.", current)
             return current.value
         if current is not None:
             if current.value in values:
                 return current.value
-            self.error(f"ERROR: expected {values}, got '{current.value}'.")
-        self.error(f"ERROR: expected {values}, got 'None'.")
+            self.error(f"ERROR: expected {values}, got '{current.value}'.", current)
+        self.error(f"ERROR: missing {values}.", current)
 
     def consume(self, *values: str) -> str:
         current = self.expect(*values)
         self.advance()
         return current
 
-    def parse_program(self) -> nodes.Node:
+    def parse_program(self) -> nodes.BlockNode:
         node_list: list[nodes.Node] = []
         while self.current_index < len(self.tokens_list):
             self.count_statements += 1
@@ -136,7 +133,7 @@ class Parser:
         while True:
             current = self.current()
             if current is None:
-                self.error(f"ERROR: expected {'}'}, got 'None'.")
+                self.error(f"ERROR: missing {'}'}.", current)
             if current.value == '}':
                 break
             block.append(self.parse_statement())
@@ -149,7 +146,11 @@ class Parser:
     def parse_assignment(self) -> nodes.Node:
         variable = self.parse_expression()
         if self.match('=') and not isinstance(variable, nodes.VariableNode):
-            self.error(f"ERROR: expected a variable, got '{variable}'.")
+            match variable:
+                case nodes.NumberNode():
+                    self.error(f"ERROR: expected a variable, got '{variable.value}'.", variable)
+                case nodes.CallNode():
+                    self.error(f"ERROR: expected a variable, got '{variable.name}'.", variable)
         if self.match('='):
             operator = self.consume('=')
             right = self.parse_expression()
@@ -216,7 +217,7 @@ class Parser:
     def parse_factor(self) -> nodes.Node:
         current = self.current()
         if current is None:
-            self.error(f"ERROR: unexpected end of expression.")
+            self.error(f"ERROR: unexpected end of expression.", current)
         match current:
             case tokens.NumberToken(position=position, end=end):
                 number = nodes.NumberNode(current.value, position=position, end=end)
@@ -231,4 +232,4 @@ class Parser:
                 node = self.parse_expression()
                 self.consume(')')
                 return node
-        self.error(f"ERROR: unexpected token '{current.value}' at position {current.position}.")
+        self.error(f"ERROR: unexpected token '{current.value}'.", current)
