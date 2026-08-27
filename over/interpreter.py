@@ -54,7 +54,7 @@ class Evaluator:
             else:
                 return operators.comparison[node.operator](left, right)
         else:
-            self.error(f"ERROR unexpected operator '{node.operator}'.", node)
+            self.error(f"ERROR: unexpected operator '{node.operator}'.", node)
 
     def if_node(self, node) -> Number | None:
         if not self.evaluate(node.condition):
