@@ -52,11 +52,11 @@ def main() -> None:
             node = parse(tokens, expression)
             result = interpret(node, expression)
             if result is not None:
-                raise InvalidExpressionError(f"ERROR: this expression is invalid.\nuse 'print({expression})'.")
+                raise InvalidExpressionError(f"ERROR: this expression is invalid.\nuse 'print()'.")
         except InvalidExpressionError as msg:
             print(msg)
-        except ReturnStatement as result:
-            print(f"ERROR: this expression is invalid.\nuse 'print({result.expression})'.")
+        except ReturnStatement:
+            print(f"ERROR: this expression is invalid.\nuse 'print()'.")
 
 def check_expression(expression: str) -> bool:
     if is_command(expression):
