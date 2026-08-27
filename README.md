@@ -7,8 +7,8 @@ Python 3.11+
 ## usage
 
 ### clone
-git clone https://github.com/renizex/OVER.git
-cd OVER
+- git clone https://github.com/renizex/OVER.git
+- cd OVER
 
 ### CLI
 python -m over.main
@@ -40,24 +40,29 @@ python IDE/ide.py
 - useful explanations.
 
 ## CLI examples
-'print(2 + 2)' -> 4,
-'print(6 + 3 ^ 2 / 3)' -> 9,
-'print(2+3*4)' -> 14,
-'print((2+3) * 4)' -> 20,
-'x = 500' -> memory: x: 500,
-'x = 1000 if x > 100 {print(x + 100)}' -> 1100,
-'function func(x, y) {if x > y {return x + y} else {return x - y}} print(func(10, 5))' -> 15.
+- 'print(2 + 2)' -> 4,
+- 'print(6 + 3 ^ 2 / 3)' -> 9,
+- 'print(2+3*4)' -> 14,
+- 'print((2+3) * 4)' -> 20,
+- 'x = 500' -> memory: x: 500,
+- 'x = 1000 if x > 100 {print(x + 100)}' -> 1100,
+- 'function func(x, y) {if x > y {return x + y} else {return x - y}} print(func(10, 5))' -> 15.
 
 ## IDE examples
-"""
+
+```OVER
 число = 500
 
-функция удвоить(число) {
-return число * 2
+функция удвоить(значение) {
+return значение * 2
 }
-""" -> 1000
 
-"""
+print(удвоить(число))
+```
+
+-> 1000
+
+```OVER
 x = 5
 y = 3
 
@@ -66,8 +71,10 @@ return x ^ y
 }
 
 z = power(x, y)
-return z
-""" -> 125
+print(z)
+```
+
+ -> 125
 
 ## IDE
 a small custom IDE made on Tkinter.
