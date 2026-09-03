@@ -227,6 +227,9 @@ class Parser:
                 variable = nodes.VariableNode(current.value, position=position, end=end)
                 self.advance()
                 return variable
+            case tokens.StringToken(value=value, position=position, end=end):
+                self.advance()
+                return nodes.StringNode(value, position=position, end=end)
             case tokens.OpeningParenthesisToken():
                 self.consume('(')
                 node = self.parse_expression()

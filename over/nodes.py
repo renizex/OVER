@@ -70,3 +70,7 @@ class BuiltinCallNode(Node):
 class UserCallNode(Node):
     name: str
     args: list[Node]
+
+@dataclass
+class StringNode(Node):
+    value: str

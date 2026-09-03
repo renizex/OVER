@@ -62,3 +62,7 @@ class ContinueArgsToken(Token):
 @dataclass
 class ReturnToken(Token):
     pass
+
+@dataclass
+class StringToken(Token):
+    pass

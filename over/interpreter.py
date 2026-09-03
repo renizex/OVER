@@ -50,6 +50,8 @@ class Evaluator:
             self.error(f"ERROR: operator '{node.operator}' requires two valid numbers, got {type(left).__name__} and {type(right).__name__}.", node)
         if node.operator in operators.operations or node.operator in operators.comparison:
             if node.operator in operators.operations:
+                if node.operator == '+' and (left, str) and isinstance(right, str):
+                    return str(left) + str(right)
                 return operators.operations[node.operator](left, right)
             else:
                 return operators.comparison[node.operator](left, right)
@@ -103,7 +105,7 @@ class Evaluator:
         finally:
             self.scope = previous_scope
 
-    def evaluate(self, node: nodes.Node) -> Number | None:
+    def evaluate(self, node: nodes.Node) -> Number | None | str:
         match node:
             case nodes.AssignNode():
                 self.assign(node)
@@ -125,6 +127,8 @@ class Evaluator:
                 return self.call_node(node)
             case nodes.ReturnNode():
                 return self.return_node(node)
+            case nodes.StringNode():
+                return str(node.value)
             case nodes.BlockNode():
                 return self.block_node(node)
         self.error(f"ERROR: '{type(node).__name__}' is an unsupported AST node.", node)
