@@ -1,6 +1,12 @@
 use std::io::{self, Write};
 
 #[derive(Debug)]
+enum LexerError {
+    UnknownSymbol(String),
+    InvalidNumber(String),
+}
+
+#[derive(Debug)]
 enum Token {
     Number(f64),
     Variable(String),
@@ -11,66 +17,70 @@ enum Token {
 enum Operator {
     Plus,
     Minus,
+    Multiply,
+    Divide,
 }
 
 fn main() {
+    println!("OVER\n");
     loop {
         print!("> ");
         io::stdout().flush().unwrap();
         let mut expression: String = String::new();
         io::stdin().read_line(&mut expression).unwrap();
-        let lexed: Vec<Token> = lex(expression);
-        println!("{:?}", lexed)
+        match lex(expression) {
+            Ok(tokens) => println!("{:?}\n", tokens),
+            Err(LexerError::UnknownSymbol(error)) => println!("{error}\n"),
+            Err(LexerError::InvalidNumber(error)) => println!("{error}\n"),
+        }
     }
 }
 
-fn lex(expression: String) -> Vec<Token> {
+fn lex(expression: String) -> Result<Vec<Token>, LexerError> {
     let mut tokens: Vec<Token> = Vec::new();
     let mut characters = expression.chars().peekable();
     while let Some(character) = characters.next() {
         match character {
             '+' => tokens.push(Token::Operator(Operator::Plus)),
             '-' => tokens.push(Token::Operator(Operator::Minus)),
+            '*' => tokens.push(Token::Operator(Operator::Multiply)),
+            '/' => tokens.push(Token::Operator(Operator::Divide)),
             character if character.is_whitespace() => continue,
             character if character.is_numeric() => {
-                let mut raw: Vec<char> = Vec::new();
-                let mut number: Vec<f64> = Vec::new();
-                raw.push(character);
+                let mut number: String = String::new();
+                number.push(character);
                 while !characters.peek().is_none() {
-                    if characters.peek().unwrap().is_numeric() {
-                        raw.push(characters.next().unwrap());
+                    if characters.peek().unwrap().is_numeric() || *characters.peek().unwrap() == '.' {
+                        number.push(characters.next().unwrap())
                     }
                     else {
                         break;
                     }
                 }
-                for char in raw {
-                    number.push(char.to_digit(10).unwrap() as f64);
+                if number.chars().last().unwrap() == '.' {
+                    return Err(LexerError::InvalidNumber(format!("ERROR: unexpected end of number '{number}'.\ntry '{number}0'.")));
                 }
-                let mut result: f64 = 0.0;
-                for num in number {
-                    result = result * 10.0 + num
-                }
-                tokens.push(Token::Number(result));
+                let number: f64 = match number.parse() {
+                    Ok(number) => number,
+                    Err(_) => return Err(LexerError::InvalidNumber(format!("ERROR: unexpected '.' in number '{number}'.")))
+                };
+                tokens.push(Token::Number(number))
             }
-            character if character.is_alphanumeric() => {
-                let mut result: String = String::new();
-                let mut chars: Vec<char> = Vec::new();
-                chars.push(character);
+            character if character.is_alphanumeric() || character == '_' => {
+                let mut variable: String = String::new();
+                variable.push(character);
                 while !characters.peek().is_none() {
-                    if characters.peek().unwrap().is_alphanumeric() {
-                        chars.push(characters.next().unwrap());
-                    } else {
+                    if characters.peek().unwrap().is_alphanumeric() || *characters.peek().unwrap() == '_' {
+                        variable.push(characters.next().unwrap())
+                    }
+                    else {
                         break;
                     }
                 }
-                for char in &chars {
-                    result += char.to_string().as_str();
-                    }
-                tokens.push(Token::Variable(result))
+                tokens.push(Token::Variable(variable))
             }
-            _ => println!("not implemented yet.")
+            _ => return Err(LexerError::UnknownSymbol(format!("ERROR: '{character}' is invalid.")))
         }
     }
-    tokens
+    Ok(tokens)
 }
