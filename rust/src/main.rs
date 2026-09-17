@@ -1,5 +1,12 @@
 use std::io::{self, Write};
 
+
+#[derive(Debug)]
+enum ParserError {
+    IndexOutOfRange(String),
+    Shit(String),
+}
+
 #[derive(Debug)]
 enum LexerError {
     UnknownSymbol(String),
@@ -7,18 +14,22 @@ enum LexerError {
 }
 
 #[derive(Debug)]
+#[derive(Clone)]
 enum Token {
     Number(f64),
     Variable(String),
-    Operator(Operator),
-}
-
-#[derive(Debug)]
-enum Operator {
     Plus,
     Minus,
     Multiply,
     Divide,
+}
+
+#[derive(Clone)]
+#[derive(Debug)]
+enum Node {
+    Number(f64),
+    Variable(String),
+    Binary(Box<Node>, char, Box<Node>)
 }
 
 fn main() {
@@ -28,11 +39,18 @@ fn main() {
         io::stdout().flush().unwrap();
         let mut expression: String = String::new();
         io::stdin().read_line(&mut expression).unwrap();
-        match lex(expression) {
-            Ok(tokens) => println!("{:?}\n", tokens),
-            Err(LexerError::UnknownSymbol(error)) => println!("{error}\n"),
-            Err(LexerError::InvalidNumber(error)) => println!("{error}\n"),
-        }
+        let tokens = match lex(expression) {
+            Ok(tokens) => tokens,
+            Err(LexerError::UnknownSymbol(error)) => {println!("{error}\n"); continue}
+            Err(LexerError::InvalidNumber(error)) => {println!("{error}\n"); continue}
+        };
+        let node = match parse(tokens.clone()) {
+            Ok(node) => node,
+            Err(ParserError::IndexOutOfRange(error)) => {println!("{error}\n"); continue}
+            Err(ParserError::Shit(error)) => {println!("{error}\n"); continue}
+        };
+        println!("tokens: {tokens:?}");
+        println!("ast: {node:?}");
     }
 }
 
@@ -41,17 +59,18 @@ fn lex(expression: String) -> Result<Vec<Token>, LexerError> {
     let mut characters = expression.chars().peekable();
     while let Some(character) = characters.next() {
         match character {
-            '+' => tokens.push(Token::Operator(Operator::Plus)),
-            '-' => tokens.push(Token::Operator(Operator::Minus)),
-            '*' => tokens.push(Token::Operator(Operator::Multiply)),
-            '/' => tokens.push(Token::Operator(Operator::Divide)),
+            '+' => tokens.push(Token::Plus),
+            '-' => tokens.push(Token::Minus),
+            '*' => tokens.push(Token::Multiply),
+            '/' => tokens.push(Token::Divide),
             character if character.is_whitespace() => continue,
             character if character.is_numeric() => {
                 let mut number: String = String::new();
                 number.push(character);
-                while !characters.peek().is_none() {
-                    if characters.peek().unwrap().is_numeric() || *characters.peek().unwrap() == '.' {
-                        number.push(characters.next().unwrap())
+                while let Some(&character) = characters.peek() {
+                    if character.is_numeric() || character == '.' {
+                        number.push(character);
+                        characters.next();
                     }
                     else {
                         break;
@@ -69,9 +88,10 @@ fn lex(expression: String) -> Result<Vec<Token>, LexerError> {
             character if character.is_alphanumeric() || character == '_' => {
                 let mut variable: String = String::new();
                 variable.push(character);
-                while !characters.peek().is_none() {
-                    if characters.peek().unwrap().is_alphanumeric() || *characters.peek().unwrap() == '_' {
-                        variable.push(characters.next().unwrap())
+                while let Some(&character) = characters.peek() {
+                    if character.is_alphanumeric() || character == '_' {
+                        variable.push(character);
+                        characters.next();
                     }
                     else {
                         break;
@@ -83,4 +103,99 @@ fn lex(expression: String) -> Result<Vec<Token>, LexerError> {
         }
     }
     Ok(tokens)
+}
+
+struct Parser {
+    tokens: Vec<Token>,
+    current_index: usize,
+
+}
+
+fn parse(tokens: Vec<Token>) -> Result<Node, ParserError> {
+    let mut parser = Parser {
+        current_index: 0,
+        tokens
+    };
+    parser.parse_expression()
+}
+
+impl Parser {
+    fn current(&self) -> Option<&Token> {
+        self.tokens.get(self.current_index)
+    }
+
+    fn advance(&mut self) {
+        self.current_index += 1
+    }
+
+    fn optional(&mut self, expected: &[char]) -> Option<char> {
+        if let Some(token) = self.current() {
+            let operator: char = match token {
+                Token::Plus => '+',
+                Token::Minus => '-',
+                Token::Multiply => '*',
+                Token::Divide => '/',
+                _ => return None
+            };
+            if expected.contains(&operator) {
+                return Some(operator)
+            }
+        }
+        None
+    }
+
+    fn consume(&mut self, expected: &[char]) -> Result<char, ParserError> {
+        if let Some(token) = self.current() {
+            let operator: char = match token {
+                Token::Plus => '+',
+                Token::Minus => '-',
+                Token::Multiply => '*',
+                Token::Divide => '/',
+                _ => return Err(ParserError::Shit(String::from("долбаеб тут нужен оператор")))
+            };
+            if expected.contains(&operator) {
+                self.advance();
+                Ok(operator)
+            }
+            else {
+                Err(ParserError::Shit(String::from("сожрать не вышло")))
+            }
+        }
+        else {
+            Err(ParserError::Shit(String::from("что ты за хуйню мне подкинул")))
+        }
+    }
+
+    fn parse_expression(&mut self) -> Result<Node, ParserError> {
+        let mut left: Node = self.parse_term()?;
+        while let Some(operator) = self.optional(&['+', '-']) {
+            self.advance();
+            let right: Node = self.parse_term()?;
+            left =  Node::Binary(Box::new(left.clone()), operator, Box::new(right));
+        };
+        Ok(left)
+    }
+
+    fn parse_term(&mut self) -> Result<Node, ParserError> {
+        let mut left: Node = self.parse_factor()?;
+        while let Some(operator) = self.optional(&['*', '/']) {
+            self.advance();
+            let right: Node = self.parse_factor()?;
+            left = Node::Binary(Box::new(left), operator, Box::new(right));
+        };
+        Ok(left)
+    }
+
+    fn parse_factor(&mut self) -> Result<Node, ParserError> {
+        if let Some(token) = self.current() {
+            match token {
+                Token::Number(token) => {let node = Ok(Node::Number(*token)); self.advance(); node}
+                Token::Variable(token) => Ok(Node::Variable(token.clone())),
+                _ => Err(ParserError::Shit(format!("ERROR: unexpected token '{:?}'", token)))
+            }
+        }
+        else {
+            Err(ParserError::Shit(String::from("ти обисрався")))
+        }
+    }
 }
