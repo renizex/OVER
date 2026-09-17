@@ -4,7 +4,7 @@ use std::io::{self, Write};
 #[derive(Debug)]
 enum ParserError {
     IndexOutOfRange(String),
-    Shit(String),
+    UnexpectedToken(String),
 }
 
 #[derive(Debug)]
@@ -47,10 +47,10 @@ fn main() {
         let node = match parse(tokens.clone()) {
             Ok(node) => node,
             Err(ParserError::IndexOutOfRange(error)) => {println!("{error}\n"); continue}
-            Err(ParserError::Shit(error)) => {println!("{error}\n"); continue}
+            Err(ParserError::UnexpectedToken(error)) => {println!("{error}\n"); continue}
         };
         println!("tokens: {tokens:?}");
-        println!("ast: {node:?}");
+        println!("ast: {node:?}\n");
     }
 }
 
@@ -151,18 +151,18 @@ impl Parser {
                 Token::Minus => '-',
                 Token::Multiply => '*',
                 Token::Divide => '/',
-                _ => return Err(ParserError::Shit(String::from("долбаеб тут нужен оператор")))
+                    _ => return Err(ParserError::UnexpectedToken(format!("ERROR: unknown token '{:?}'.", token)))
             };
             if expected.contains(&operator) {
                 self.advance();
                 Ok(operator)
             }
             else {
-                Err(ParserError::Shit(String::from("сожрать не вышло")))
+                Err(ParserError::UnexpectedToken(format!("ERROR: expected '{:?}', got '{:?}'.", expected, token)))
             }
         }
         else {
-            Err(ParserError::Shit(String::from("что ты за хуйню мне подкинул")))
+            Err(ParserError::UnexpectedToken(String::from("ERROR: unexpected 'none' type.")))
         }
     }
 
@@ -191,11 +191,11 @@ impl Parser {
             match token {
                 Token::Number(token) => {let node = Ok(Node::Number(*token)); self.advance(); node}
                 Token::Variable(token) => Ok(Node::Variable(token.clone())),
-                _ => Err(ParserError::Shit(format!("ERROR: unexpected token '{:?}'", token)))
+                _ => Err(ParserError::UnexpectedToken(format!("ERROR: unexpected token '{:?}'.", token)))
             }
         }
         else {
-            Err(ParserError::Shit(String::from("ти обисрався")))
+            Err(ParserError::UnexpectedToken(String::from("ERROR: unexpected nothing.")))
         }
     }
 }
