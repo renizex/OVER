@@ -1,15 +1,15 @@
 use std::io::{self, Write};
 use std::collections::HashMap;
-fn plus(a: f64, b: f64) -> Result<f64, InterpretError> {
-    Ok(a+b)
+fn plus(a: f64, b: f64) -> f64 {
+    a+b
 }
 
-fn minus(a: f64, b: f64) -> Result<f64, InterpretError> {
-    Ok(a-b)
+fn minus(a: f64, b: f64) -> f64 {
+    a-b
 }
 
-fn multiply(a: f64, b: f64) -> Result<f64, InterpretError> {
-    Ok(a*b)
+fn multiply(a: f64, b: f64) -> f64 {
+    a*b
 }
 
 fn divide(a: f64, b: f64) -> Result<f64, InterpretError> {
@@ -20,6 +20,11 @@ fn divide(a: f64, b: f64) -> Result<f64, InterpretError> {
         Ok(a/b)
     }
 }
+
+fn unary_minus(a: f64) -> f64 {
+    -a
+}
+
 #[derive(Debug)]
 enum InterpretError {
     UnexpectedNode(String),
@@ -59,6 +64,7 @@ enum Node {
     Number(f64),
     Variable(String),
     Binary(Box<Node>, char, Box<Node>),
+    UnaryMinus(Box<Node>),
     Assignment(String, Box<Node>),
     Block(Vec<Node>),
 }
@@ -180,6 +186,8 @@ impl Parser {
                 Token::Multiply => '*',
                 Token::Divide => '/',
                 Token::Assign => '=',
+                Token::OpenParenthesis => '(',
+                Token::CloseParenthesis => ')',
                 _ => return None
             };
             if expected.contains(&operator) {
@@ -197,6 +205,8 @@ impl Parser {
                 Token::Multiply => '*',
                 Token::Divide => '/',
                 Token::Assign => '=',
+                Token::OpenParenthesis => '(',
+                Token::CloseParenthesis => ')',
                     _ => return Err(ParseError::UnexpectedToken(format!("ERROR: unknown token '{:?}'.", token)))
             };
             if expected.contains(&operator) {
@@ -237,13 +247,22 @@ impl Parser {
     }
 
     fn parse_term(&mut self) -> Result<Node, ParseError> {
-        let mut left: Node = self.parse_factor()?;
+        let mut left: Node = self.parse_unary()?;
         while let Some(operator) = self.optional(&['*', '/']) {
             self.advance();
-            let right: Node = self.parse_factor()?;
+            let right: Node = self.parse_unary()?;
             left = Node::Binary(Box::new(left), operator, Box::new(right));
         };
         Ok(left)
+    }
+
+    fn parse_unary(&mut self) -> Result<Node, ParseError> {
+        if let Some(_) = self.optional(&['-']) {
+            self.advance();
+            let expression: Node = self.parse_unary()?;
+            return Ok(Node::UnaryMinus(Box::new(expression)))
+        }
+        self.parse_factor()
     }
 
     fn parse_factor(&mut self) -> Result<Node, ParseError> {
@@ -253,9 +272,9 @@ impl Parser {
                 Token::Variable(token) => {let node = Ok(Node::Variable(token.clone())); self.advance(); node}
                 Token::OpenParenthesis => {
                     self.advance();
-                    let expression = self.parse_expression();
+                    let expression = self.parse_expression()?;
                     let _ = self.consume(&[')']);
-                    expression
+                    Ok(expression)
                 }
                 _ => Err(ParseError::UnexpectedToken(format!("ERROR: unexpected token '{:?}'.", token)))
             }
@@ -280,9 +299,9 @@ impl Interpret {
                 let left = self.evaluate(*left)?;
                 let right = self.evaluate(*right)?;
                 match operator {
-                    '+' => Ok(plus(left, right)?),
-                    '-' => Ok(minus(left, right)?),
-                    '*' => Ok(multiply(left, right)?),
+                    '+' => Ok(plus(left, right)),
+                    '-' => Ok(minus(left, right)),
+                    '*' => Ok(multiply(left, right)),
                     '/' => Ok(divide(left, right)?),
                     _ => Err(InterpretError::InvalidOperator(format!("unknown operator '{operator}'.")))
                 }
@@ -299,6 +318,10 @@ impl Interpret {
                     result = self.evaluate(node);
                 };
                 result
+            }
+            Node::UnaryMinus(node) => {
+                let number = self.evaluate(*node)?;
+                Ok(unary_minus(number))
             }
         }
     }
