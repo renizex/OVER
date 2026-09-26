@@ -2,8 +2,12 @@ use std::io::{self, Write};
 use std::fmt::Write as FmtWrite;
 use std::collections::HashMap;
 
-fn plus(a: f64, b: f64) -> f64 {
-    a+b
+fn plus(a: Value, b: Value) -> Result<Value, InterpretError> {
+    match (&a, &b) {
+        (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
+        (Value::String(a), Value::String(b)) => Ok(Value::String(a.to_owned() + b)),
+        _ => Err(InterpretError::InvalidType(format!("ERROR: expected {}, got {}.", a.type_name(), b.type_name())))
+    }
 }
 
 fn minus(a: f64, b: f64) -> f64 {
@@ -33,8 +37,13 @@ fn less(a: f64, b: f64) -> bool {
     a < b
 }
 
-fn equal(a: f64, b: f64) -> bool {
-    a == b
+fn equal(a: Value, b: Value) -> Result<bool, InterpretError> {
+    match (&a, &b) {
+        (Value::Number(a), Value::Number(b)) => Ok(a == b),
+        (Value::String(a), Value::String(b)) => Ok(a == b),
+        (Value::Bool(a), Value::Bool(b)) => Ok(a == b),
+        _ => Err(InterpretError::InvalidType(format!("ERROR: expected {}, got {}.", a.type_name(), b.type_name())))
+    }
 }
 
 fn greaterequal(a: f64, b: f64) -> bool {
@@ -45,14 +54,12 @@ fn lessequal(a: f64, b: f64) -> bool {
     a <= b
 }
 
-fn notequal(a: f64, b: f64) -> bool {
-    a != b
-}
-
+#[derive(Clone)]
 #[derive(Debug)]
 enum Value {
     Number(f64),
     Bool(bool),
+    String(String),
     Nothing,
     Break,
     Continue,
@@ -62,14 +69,14 @@ impl Value {
     fn expect_number(&self) -> Result<f64, InterpretError> {
         match self {
             Value::Number(value) => Ok(*value),
-            _ => Err(InterpretError::UnexpectedValue(format!("ERROR: expected number, got {}", self.type_name()))),
+            _ => Err(InterpretError::UnexpectedValue(format!("ERROR: expected number, got {}.", self.type_name()))),
         }
     }
 
     fn expect_bool(&self) -> Result<bool, InterpretError> {
         match self {
             Value::Bool(value) => Ok(*value),
-            _ => Err(InterpretError::UnexpectedValue(format!("ERROR: expected bool, got {}", self.type_name()))),
+            _ => Err(InterpretError::UnexpectedValue(format!("ERROR: expected bool, got {}.", self.type_name()))),
         }
     }
 
@@ -91,6 +98,7 @@ impl Value {
         match self {
             Value::Number(value) => value.to_string(),
             Value::Bool(value) => value.to_string(),
+            Value::String(value) => value.to_string(),
             Value::Nothing => String::from("null(scape)"),
             Value::Break => String::from("break"),
             Value::Continue => String::from("continue"),
@@ -101,6 +109,7 @@ impl Value {
         match self {
             Value::Number(_) => "number",
             Value::Bool(_) => "bool",
+            Value::String(_) => "string",
             Value::Nothing => "nothing",
             Value::Break => "break",
             Value::Continue => "continue",
@@ -116,6 +125,7 @@ enum InterpretError {
     DivisionByZero(String),
     UnexpectedValue(String),
     ExecutionLimit(String),
+    InvalidType(String),
 }
 
 #[derive(Debug)]
@@ -129,13 +139,16 @@ enum LexError {
     UnexpectedSymbol(String),
     UnknownSymbol(String),
     InvalidNumber(String),
+    InvalidString(String),
 }
 
 #[derive(Debug)]
 #[derive(Clone)]
 enum Token {
     Number(f64, usize, usize),
-    Variable(String, usize, usize),
+    Identifier(String, usize, usize),
+    String(String, usize, usize),
+    Bool(bool, usize, usize),
     OpenParenthesis(usize, usize),
     CloseParenthesis(usize, usize),
     OpenBrace(usize, usize),
@@ -156,8 +169,6 @@ enum Token {
     While(usize, usize),
     Loop(usize, usize),
     Break(usize, usize),
-    True(usize, usize),
-    False(usize, usize),
     Continue(usize, usize),
 }
 
@@ -165,7 +176,9 @@ impl Token {
     fn info(&self) -> (usize, usize) {
         match self {
             Token::Number(_, start, end) => (*start, *end),
-            Token::Variable(_, start, end) => (*start, *end),
+            Token::Identifier(_, start, end) => (*start, *end),
+            Token::String(_, start, end) => (*start, *end),
+            Token::Bool(_, start, end) => (*start, *end),
             Token::OpenParenthesis(start, end) => (*start, *end),
             Token::CloseParenthesis(start, end) => (*start, *end),
             Token::OpenBrace(start, end) => (*start, *end),
@@ -186,8 +199,6 @@ impl Token {
             Token::While(start, end) => (*start, *end),
             Token::Loop(start, end) => (*start, *end),
             Token::Break(start, end) => (*start, *end),
-            Token::True(start, end) => (*start, *end),
-            Token::False(start, end) => (*start, *end),
             Token::Continue(start, end) => (*start, *end),
         }
     }
@@ -195,7 +206,9 @@ impl Token {
     fn value(&self) -> String {
         match self {
             Token::Number(value, _ ,_) => value.to_string(),
-            Token::Variable(value, _, _) => value.clone(),
+            Token::Identifier(value, _, _) => value.clone(),
+            Token::String(value, _, _) => value.clone(),
+            Token::Bool(value, _, _) => value.to_string(),
             Token::OpenParenthesis(_, _) => String::from("("),
             Token::CloseParenthesis(_, _) => String::from(")"),
             Token::OpenBrace(_, _) => String::from("{"),
@@ -216,8 +229,6 @@ impl Token {
             Token::While(_, _) => String::from("while"),
             Token::Loop(_, _) => String::from("loop"),
             Token::Break(_, _) => String::from("break"),
-            Token::True(_, _) => String::from("true"),
-            Token::False(_, _) => String::from("false"),
             Token::Continue(_, _) => String::from("continue"),
         }
     }
@@ -227,7 +238,9 @@ impl Token {
 #[derive(Debug)]
 enum Node {
     Number(f64, usize, usize),
-    Variable(String, usize, usize),
+    Identifier(String, usize, usize),
+    String(String, usize, usize),
+    Bool(bool, usize, usize),
     Binary(Box<Node>, Token, Box<Node>),
     UnaryMinus(Box<Node>),
     Assignment(String, Box<Node>, usize, usize),
@@ -236,8 +249,6 @@ enum Node {
     Loop(Box<Node>, usize, usize),
     Break(usize, usize),
     Block(Vec<Node>, usize, usize),
-    True(usize, usize),
-    False(usize, usize),
     Continue(usize, usize),
 }
 
@@ -245,7 +256,9 @@ impl Node {
     fn info(&self) -> (usize, usize) {
         match self {
             Node::Number(_, start, end) => (*start, *end),
-            Node::Variable(_, start, end) => (*start, *end),
+            Node::Identifier(_, start, end) => (*start, *end),
+            Node::String(_, start, end) => (*start, *end),
+            Node::Bool(_, start, end) => (*start, *end),
             Node::Binary(start_node, _, end_node) => {
                 let (start, _) = start_node.info();
                 let (_, end) = end_node.info();
@@ -258,8 +271,6 @@ impl Node {
             Node::Loop(_,  start, end) => (*start, *end),
             Node::Break(start, end) => (*start, *end),
             Node::Block(_, start, end) => (*start, *end),
-            Node::True(start, end) => (*start, *end),
-            Node::False(start, end) => (*start, *end),
             Node::Continue(start, end) => (*start, *end),
         }
     }
@@ -267,7 +278,9 @@ impl Node {
     fn value(&self) -> String {
         match self {
             Node::Number(value, _, _) => value.to_string(),
-            Node::Variable(value, _, _) => value.clone(),
+            Node::Identifier(value, _, _) => value.clone(),
+            Node::String(value, _, _) => value.clone(),
+            Node::Bool(value, _, _) => value.to_string(),
             Node::Binary(start_node, operator, end_node) => {let start = start_node.value(); let end = end_node.value(); start + &operator.value() + &end},
             Node::UnaryMinus(node) => "-".to_owned() + &node.value(),
             Node::Assignment(start, end, _, _) => start.to_owned() + "=" + &end.value(),
@@ -275,8 +288,6 @@ impl Node {
             Node::While(condition, body, _, _, _) => {"while ".to_owned() + &condition.value() + " {\n" + &body.value() + "\n" + "}"}
             Node::Loop(body, _, _) => {"loop ".to_owned() + " {\n" + &body.value() + "\n" + "}"}
             Node::Break(_, _) => String::from("break"),
-            Node::True(_, _) => String::from("true"),
-            Node::False(_, _) => String::from("false"),
             Node::Continue(_, _) => String::from("continue"),
             Node::Block(nodes, _, _) => {
                 let mut result = String::new();
@@ -319,6 +330,7 @@ fn main() {
             Err(LexError::UnknownSymbol(error)) => {println!("{error}\n"); continue}
             Err(LexError::InvalidNumber(error)) => {println!("{error}\n"); continue}
             Err(LexError::UnexpectedSymbol(error)) => {println!("{error}\n"); continue}
+            Err(LexError::InvalidString(error)) => {println!("{error}\n"); continue}
         };
         let node = match parse(tokens.clone(), expression.clone()) {
             Ok(node) => node,
@@ -333,6 +345,7 @@ fn main() {
             // Err(InterpretError::UnexpectedNode(error)) => {println!("{error}\n"); continue},
             Err(InterpretError::UnexpectedValue(error)) => {println!("{error}\n"); continue},
             Err(InterpretError::ExecutionLimit(error)) => {println!("{error}\n"); continue},
+            Err(InterpretError::InvalidType(error)) => {println!("{error}\n"); continue},
         };
         if debug {
             println!("\ntokens: {tokens:?}");
@@ -438,11 +451,37 @@ fn lex(expression: String) -> Result<Vec<Token>, LexError> {
                     "while" => tokens.push(Token::While(index, index + 5)),
                     "loop" => tokens.push(Token::Loop(index, index + 4)),
                     "break" => tokens.push(Token::Break(index, index + 5)),
-                    "true" => tokens.push(Token::True(index, index + 4)),
-                    "false" => tokens.push(Token::False(index, index + 5)),
+                    "true" => tokens.push(Token::Bool(true, index, index + 4)),
+                    "false" => tokens.push(Token::Bool(false, index, index + 5)),
                     "continue" => tokens.push(Token::Continue(index, index + 8)),
-                    _ => tokens.push(Token::Variable(variable, index, length))
+                    _ => tokens.push(Token::Identifier(variable, index, length))
                 }
+            }
+            character if character == '"' => {
+                let mut string = String::new();
+                string.push(character);
+                if let Some((_, character)) = characters.next() {
+                    string.push(character)
+                }
+                while let Some(&(_, character)) = characters.peek() {
+                    if character.is_numeric() || character.is_alphanumeric() || character == '_' || character == '"' {
+                        string.push(character);
+                        characters.next();
+                    }
+                    else {
+                        break
+                    }
+                }
+                let (start, end) = (index, index + string.chars().count());
+                if string.chars().last() == Some('"') && string.chars().next() == Some('"') {
+                    string.pop();
+                    string.remove(0);
+                }
+                else {
+                    println!("{string}");
+                    return Err(LexError::InvalidString(error(expression, start, end, String::from("invalid string."))))
+                }
+                tokens.push(Token::String(string, start, end))
             }
             _ => return Err(LexError::UnknownSymbol(error(expression, index, index + 1, format!("'{character}' is invalid."))))
         }
@@ -500,7 +539,7 @@ impl Parser {
         if let Some(token) = self.current().cloned() {
             let value: String = match token {
                 Token::Number(value, start, end) => return Err(ParseError::UnexpectedToken(error(self.expression.clone(), start, end, format!("unexpected number '{value}'.")))),
-                Token::Variable(value, start, end) => return Err(ParseError::UnexpectedToken(error(self.expression.clone(), start, end, format!("unexpected identifier '{value}'")))),
+                Token::Identifier(value, start, end) => return Err(ParseError::UnexpectedToken(error(self.expression.clone(), start, end, format!("unexpected identifier '{value}'")))),
                 _ => token.value()
             };
             if expected.contains(&&*value) {
@@ -553,7 +592,6 @@ impl Parser {
         if let Some(_) =  self.optional(&["else"]) {
             self.advance();
             let elsebody = self.parse_block()?;
-
             return Ok(Node::While(Box::new(condition), Box::new(body), Some(Box::new(elsebody)), start, self.current_index))
         }
         Ok(Node::While(Box::new(condition), Box::new(body), None, start, self.current_index))
@@ -583,8 +621,6 @@ impl Parser {
             Some(Token::While(_, _)) => self.parse_while(),
             Some(Token::Loop(_, _)) => self.parse_loop(),
             Some(Token::Break(start, end)) => {let (start, end) = (*start, *end); self.advance(); Ok(Node::Break(start, end))},
-            Some(Token::True(start, end)) => {let (start, end) = (*start, *end); self.advance(); Ok(Node::True(start, end))},
-            Some(Token::False(start, end)) => {let (start, end) = (*start, *end); self.advance(); Ok(Node::False(start, end))},
             Some(Token::Continue(start, end)) => {let (start, end) = (*start, *end); self.advance(); Ok(Node::Continue(start, end))},
             _ => self.parse_assignment()
         }
@@ -596,8 +632,7 @@ impl Parser {
             self.advance();
             let right: Node = self.parse_comparison()?;
             let (variable, start) = match left {
-                Node::Variable(value, start, _) => Ok((value, start)),
-                Node::Number(value, start, end) => Err(ParseError::UnexpectedToken(error(self.expression.clone(), start, end, format!("expected identifier, got '{value}'.")))),
+                Node::Identifier(value, start, _) => Ok((value, start)),
                 _ => {
                     let value: String = left.value();
                     let (start, end) = left.info();
@@ -616,9 +651,11 @@ impl Parser {
             self.advance();
             let right: Node = self.parse_expression()?;
                 let left: Node = match &left {
-                    Node::Variable(_, _, _) => Ok(left),
+                    Node::Identifier(_, _, _) => Ok(left),
                     Node::Number(_, _, _) => Ok(left),
                     Node::Binary(_, _, _) => Ok(left),
+                    Node::String(_, _, _) => Ok(left),
+                    Node::Bool(_, _, _) => Ok(left),
                 _ => {let (value, (start, end)) = (right.value(), right.info()); Err(ParseError::UnexpectedToken(error(self.expression.clone(), start, end, format!("expected identifier, got '{value}'."))))} }?;
             return Ok(Node::Binary(Box::new(left), operator, Box::new(right)))
         }
@@ -658,7 +695,9 @@ impl Parser {
         if let Some(token) = self.current() {
             match token {
                 Token::Number(token, start, end) => {let node = Ok(Node::Number(*token, *start, *end)); self.advance(); node}
-                Token::Variable(token, start, end) => {let node = Ok(Node::Variable(token.clone(), *start, *end)); self.advance(); node}
+                Token::Identifier(token, start, end) => {let node = Ok(Node::Identifier(token.clone(), *start, *end)); self.advance(); node}
+                Token::String(value, start, end) => {let (value, start, end) = (value.clone(), *start, *end); self.advance(); Ok(Node::String(value, start, end))},
+                Token::Bool(bool, start, end) => {let (bool, start, end) = (*bool, *start, *end); self.advance(); Ok(Node::Bool(bool, start, end))},
                 Token::OpenParenthesis(_, _) => {
                     self.advance();
                     let expression = self.parse_expression()?;
@@ -676,40 +715,43 @@ impl Parser {
 }
 
 struct Interpret {
-    variables: HashMap<String, f64>,
+    variables: HashMap<String, Value>,
     expression: String,
 }
 
 impl Interpret {
+    fn binary(&self, left: Value, operator: &Token, right: Value, node: &Node) -> Result<Value, InterpretError> {
+        match operator {
+            Token::Plus(_, _) => Ok(plus(left, right)?),
+            Token::Minus(_, _) => {let a: f64 = left.expect_number()?; let b: f64 = right.expect_number()?; Ok(Value::Number(minus(a, b)))},
+            Token::Multiply(_, _) => {let a: f64 = left.expect_number()?; let b: f64 = right.expect_number()?; Ok(Value::Number(multiply(a, b)))},
+            Token::Divide(_, _) => {let a: f64 = left.expect_number()?; let b: f64 = right.expect_number()?; Ok(Value::Number(divide(a, b)?))},
+            Token::Greater(_, _) => {let a: f64 = left.expect_number()?; let b: f64 = right.expect_number()?; Ok(Value::Bool(greater(a, b)))},
+            Token::Less(_, _) => {let a: f64 = left.expect_number()?; let b: f64 = right.expect_number()?; Ok(Value::Bool(less(a, b)))},
+            Token::Equal(_, _) => {Ok(Value::Bool(equal(left, right)?))},
+            Token::GreaterEqual(_, _) => {let a: f64 = left.expect_number()?; let b: f64 = right.expect_number()?;  Ok(Value::Bool(greaterequal(a, b)))},
+            Token::LessEqual(_, _) => {let a: f64 = left.expect_number()?; let b: f64 = right.expect_number()?;  Ok(Value::Bool(lessequal(a, b)))},
+            Token::NotEqual(_, _) => {Ok(Value::Bool(!equal(left, right)?))},
+            _ => {let (value, (start, end)) = (&node.value(), &node.info()); Err(InterpretError::InvalidOperator(error(self.expression.clone(), *start, *end, format!("unknown operator '{value}'."))))}
+        }
+    }
+
     fn evaluate(&mut self, node: &Node) -> Result<Value, InterpretError> {
         // println!("{:?}", node);
         match node {
             Node::Number(value, _, _) => Ok(Value::Number(*value)),
-            Node::Variable(value, _, _) => Ok(Value::Number(resolve_variable(&self.variables, value)?)),
+            Node::Identifier(value, _, _) => Ok(resolve_variable(&self.variables, value)?),
+            Node::String(value, _, _) => Ok(Value::String(value.clone())),
             Node::Binary(left, operator, right) => {
                 let left: Value = self.evaluate(left)?;
                 let right: Value = self.evaluate(right)?;
-                let a: f64 = left.expect_number()?;
-                let b: f64 = right.expect_number()?;
-                match operator {
-                    Token::Plus(_, _) => Ok(Value::Number(plus(a, b))),
-                    Token::Minus(_, _) => Ok(Value::Number(minus(a, b))),
-                    Token::Multiply(_, _) => Ok(Value::Number(multiply(a, b))),
-                    Token::Divide(_, _) => Ok(Value::Number(divide(a, b)?)),
-                    Token::Greater(_, _) => Ok(Value::Bool(greater(a, b))),
-                    Token::Less(_, _) => Ok(Value::Bool(less(a, b))),
-                    Token::Equal(_, _) => Ok(Value::Bool(equal(a, b))),
-                    Token::GreaterEqual(_, _) => Ok(Value::Bool(greaterequal(a, b))),
-                    Token::LessEqual(_, _) => Ok(Value::Bool(lessequal(a, b))),
-                    Token::NotEqual(_, _) => Ok(Value::Bool(notequal(a, b))),
-                    _ => {let (value, (start, end)) = (&node.value(), &node.info()); Err(InterpretError::InvalidOperator(error(self.expression.clone(), *start, *end, format!("unknown operator '{value}'."))))}
-                }
+                self.binary(left, operator, right, node)
             }
             Node::Assignment(variable, expression, _, _) => {
                 // println!("variable: {:?}\n expression: {:?}", variable, expression);
-                let expression: f64 = self.evaluate(expression)?.expect_number()?;
-                self.variables.insert(variable.clone(), expression);
-                Ok(Value::Number(expression))
+                let expression: Value = self.evaluate(expression)?;
+                self.variables.insert(variable.clone(), expression.clone());
+                Ok(expression)
             }
             Node::If(condition, body, elsebody, _, _) => {
                 if self.evaluate(condition)?.expect_bool()? {
@@ -776,8 +818,7 @@ impl Interpret {
                     };
                 Ok(result)
             }
-            Node::True(_, _) => Ok(Value::Bool(true)),
-            Node::False(_, _) => Ok(Value::Bool(false)),
+            Node::Bool(bool, _, _) => {let bool = *bool; Ok(Value::Bool(bool))},
             Node::UnaryMinus(node) => {
                 let number: f64 = self.evaluate(node)?.expect_number()?;
                 Ok(Value::Number(unary_minus(number)))
@@ -787,14 +828,14 @@ impl Interpret {
 }
 
 fn interpret(node: &Node, expression: String) -> Result<Value, InterpretError> {
-    let variables = HashMap::<String, f64>::new();
+    let variables = HashMap::<String, Value>::new();
     let mut interpret = Interpret{variables, expression};
     interpret.evaluate(node)
 }
 
-fn resolve_variable(variables: &HashMap<String, f64>, variable: &str) -> Result<f64, InterpretError> {
+fn resolve_variable(variables: &HashMap<String, Value>, variable: &str) -> Result<Value, InterpretError> {
     if let Some(value) = variables.get(variable) {
-        Ok(*value)
+        Ok(value.clone())
     }
     else {
         Err(InterpretError::InvalidVariable(format!("ERROR: variable '{variable}' does not exist.\nif stuck, try to input in one line.\nexample: x = 5 y = x x * y")))
