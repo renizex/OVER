@@ -169,7 +169,40 @@ impl Interpret {
             }
             Node::Return(expression, _, _) => {
                 let expression = if expression.is_some() {Some(*expression.clone().unwrap())} else {None};
-                Ok(Flow::Return(expression))},
+                Ok(Flow::Return(expression))
+            },
+            Node::List(list, _, _) => {
+                let mut result = Vec::new();
+                for node in list {
+                    result.push(self.evaluate(node, variables)?)
+                }
+                Ok(Flow::Value(Value::List(result)))
+            }
+            Node::Index(identifier, index, start, end) => {
+                let flow = self.evaluate(identifier, variables)?;
+                let index = self.evaluate(index, variables)?;
+                match &flow {
+                    Flow::Value(Value::List(list)) => match index {
+                        Flow::Value(Value::Number(index)) => {
+                            if index.fract() != 0.0 {
+                                {let (start, end) = (*start, *end); Err(InterpretError::InvalidVariable(error(&self.expression, start, end, format!("index '{index}' is invalid. try '0'."))))}
+                            }
+                            else if index < 0.0 {
+                                {let (start, end) = (*start, *end); Err(InterpretError::InvalidVariable(error(&self.expression, start, end, String::from("index can not be negative."))))}
+                            }
+                            else {
+                                let index: usize = index as usize;
+                                match list.get(index) {
+                                    Some(shit) => Ok(shit.clone()),
+                                    None => {let (start, end) = (*start, *end); Err(InterpretError::InvalidVariable(error(&self.expression, start, end, format!("index '{index}' out of range."))))}
+                                }
+                            }
+                        }
+                        _ => {let (start, end) = (*start, *end); Err(InterpretError::InvalidVariable(error(&self.expression, start, end, String::from("index can only be integer."))))}
+                    },
+                    _ => {let (start, end) = (start - flow.display().len(), *start); Err(InterpretError::InvalidVariable(error(&self.expression, start, end, format!("'{}' is not a list.", flow.display()))))}
+                }
+            },
         }
     }
 }

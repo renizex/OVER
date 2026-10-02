@@ -14,6 +14,8 @@ pub fn lex(expression: &str) -> Result<Vec<Token>, LexError> {
             ')' => tokens.push(Token::CloseParenthesis(index, index + 1)),
             '{' => tokens.push(Token::OpenBrace(index, index + 1)),
             '}' => tokens.push(Token::CloseBrace(index, index + 1)),
+            '[' => tokens.push(Token::OpenBracket(index, index + 1)),
+            ']' => tokens.push(Token::CloseBracket(index, index + 1)),
             '=' => {
                 if let Some(&(_, character)) = characters.peek() {
                     if character == '=' {

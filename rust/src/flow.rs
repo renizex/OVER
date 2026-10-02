@@ -14,6 +14,7 @@ pub enum Value {
     Number(f64),
     Bool(bool),
     String(String),
+    List(Vec<Flow>),
     Nothing,
 
 }
@@ -71,12 +72,7 @@ impl Flow {
 
     pub fn display(&self) -> String {
         match self {
-            Flow::Value(value) => match value {
-                Value::Number(value) => value.to_string(),
-                Value::Bool(value) => value.to_string(),
-                Value::String(value) => value.clone(),
-                Value::Nothing => String::from("nothing"),
-            },
+            Flow::Value(value) => value.display(),
             Flow::Break => String::from("break"),
             Flow::Continue => String::from("continue"),
             Flow::Return(_) => String::from("return"),
@@ -91,6 +87,24 @@ impl Value {
             Value::Bool(_) => "bool",
             Value::String(_) => "string",
             Value::Nothing => "nothing",
+            Value::List(_) => "list",
+        }
+    }
+
+    pub fn display(&self) -> String {
+        match self {
+            Value::Number(value) => value.to_string(),
+            Value::Bool(value) => value.to_string(),
+            Value::String(value) => value.clone(),
+            Value::Nothing => String::from("nothing"),
+            Value::List(list) => {
+                let list: Vec<String> = list.iter().map(|x|
+                    match x {
+                        Flow::Value(Value::String(_)) => format!("\"{}\"", x.display()),
+                        _ => x.display()
+                    }).collect();
+                format!("[{}]", list.join(", "))
+            }
         }
     }
 }

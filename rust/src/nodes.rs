@@ -6,6 +6,7 @@ pub enum Node {
     Identifier(String, usize, usize),
     String(String, usize, usize),
     Bool(bool, usize, usize),
+    List(Vec<Node>, usize, usize),
     Binary(Box<Node>, Token, Box<Node>),
     UnaryMinus(Box<Node>),
     Assignment(String, Box<Node>, usize, usize),
@@ -18,6 +19,7 @@ pub enum Node {
     Function(Box<Node>, Vec<Node>, Box<Node>, usize, usize),
     Call(Box<Node>, Vec<Node>, usize, usize),
     Return(Option<Box<Node>>, usize, usize),
+    Index(Box<Node>, Box<Node>, usize, usize),
 }
 
 impl Node {
@@ -27,6 +29,7 @@ impl Node {
             Node::Identifier(_, start, end) => (*start, *end),
             Node::String(_, start, end) => (*start, *end),
             Node::Bool(_, start, end) => (*start, *end),
+            Node::List(_, start, end) => (*start, *end),
             Node::Binary(start_node, _, end_node) => {
                 let (start, _) = start_node.info();
                 let (_, end) = end_node.info();
@@ -43,6 +46,7 @@ impl Node {
             Node::Function(_, _, _, start, end) => (*start, *end),
             Node::Call(_, _, start, end) => (*start, *end),
             Node::Return(_, start, end) => (*start, *end),
+            Node::Index(_, _, start, end) => (*start, *end),
         }
     }
 
@@ -52,6 +56,7 @@ impl Node {
             Node::Identifier(value, _, _) => value.clone(),
             Node::String(value, _, _) => value.clone(),
             Node::Bool(value, _, _) => value.to_string(),
+            Node::List(list, _, _) => {let result: Vec<String> = list.iter().map(|x| x.value()).collect(); "[".to_string() + &result.join(", ") + "]"},
             Node::Binary(start_node, operator, end_node) => {let start = start_node.value(); let end = end_node.value(); start + &operator.value() + &end},
             Node::UnaryMinus(node) => "-".to_owned() + &node.value(),
             Node::Assignment(start, end, _, _) => start.to_owned() + "=" + &end.value(),
@@ -71,7 +76,8 @@ impl Node {
             }
             Node::Function(identifier, _, body, _, _) => {identifier.value() + "(...)" + " {\n" + &*body.value() + " \n}"}
             Node::Call(identifier, _, _, _) => {identifier.value() + "(...)" + " {\n" + " \n}"}
-            Node::Return(_, _, _) => String::from("return")
+            Node::Return(_, _, _) => String::from("return"),
+            Node::Index(list, index , _, _) => format!("{}[{}]", list.value(), index.value()),
         }
     }
 }
