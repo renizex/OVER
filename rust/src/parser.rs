@@ -219,7 +219,7 @@ impl Parser {
     }
 
     fn parse_term(&mut self) -> Result<Node, ParseError> {
-        let mut left: Node = self.parse_postfix()?;
+        let mut left: Node = self.parse_unary()?;
         while let Some(operator) = self.optional(&["*", "/"]) {
             self.advance();
             let right: Node = self.parse_unary()?;
@@ -228,13 +228,22 @@ impl Parser {
         Ok(left)
     }
 
+    fn parse_unary(&mut self) -> Result<Node, ParseError> {
+        if let Some(_) = self.optional(&["-"]) {
+            self.advance();
+            let expression: Node = self.parse_unary()?;
+            return Ok(Node::UnaryMinus(Box::new(expression)))
+        }
+        self.parse_postfix()
+    }
+
     fn parse_postfix(&mut self) -> Result<Node, ParseError> {
-        let mut prefix: Node = self.parse_unary()?;
-        while let Some(postfix) = self.optional(&["[", "."]) {
+        let mut prefix: Node = self.parse_factor()?;
+        while let Some(postfix) = self.optional(&["[", ".", "("]) {
             let start = self.current_index;
             self.advance();
             if postfix.value() == "[" {
-                let index = self.parse_unary()?;
+                let index = self.parse_factor()?;
                 if !self.optional(&["]"]).is_some() {
                     self.consume(&["]"])?;
                 }
@@ -244,58 +253,40 @@ impl Parser {
             }
             else if postfix.value() == "." {
                 let mut object = Vec::new();
-                let method = self.parse_unary()?;
-                match &method {
-                    Node::Call(_, arguments, _, _) => {
+                let identifier = match self.parse_postfix()? {
+                    Node::Call(identifier, arguments, _, _) => {
                         object.push(prefix);
-                        let mut count = 0;
-                        while count != arguments.len() {
+                        for _ in 0..arguments.len() {
                             object.push(arguments[arguments.len() - 1].clone());
-                            count += 1;
                         }
+                        identifier
                     }
                     _ => return Err(ParseError::UnexpectedEndOfInput(String::from("expected method, got identifier.")))
-                }
+                };
                 let end = self.current_index;
-                prefix = Node::Call(Box::new(method), object, start, end)
+                prefix = Node::Call(identifier, object, start, end)
+            }
+            else if postfix.value() == "(" {
+                let mut arguments = Vec::new();
+                if let Some(_) = self.optional(&[")"]) {
+                    let (_, end) = self.current().unwrap().info();
+                    self.advance();
+                    return Ok(Node::Call(Box::new(prefix), arguments, start, end))
+                }
+                arguments.push(self.parse_expression()?);
+                while let Some(_) = self.optional(&[","]) {
+                    self.advance();
+                    arguments.push(self.parse_expression()?);
+                }
+                if !self.optional(&[")"]).is_some() {
+                    self.consume(&[")"])?;
+                }
+                let (_, end) = self.current().unwrap().info();
+                self.consume(&[")"])?;
+                return Ok(Node::Call(Box::new(prefix), arguments, start, end))
             }
         }
         Ok(prefix)
-    }
-
-    fn parse_unary(&mut self) -> Result<Node, ParseError> {
-        if let Some(_) = self.optional(&["-"]) {
-            self.advance();
-            let expression: Node = self.parse_unary()?;
-            return Ok(Node::UnaryMinus(Box::new(expression)))
-        }
-        self.parse_call()
-    }
-
-    fn parse_call(&mut self) -> Result<Node, ParseError> {
-        let identifier: Node = self.parse_factor()?;
-        if let Some(_) = self.optional(&["("]) {
-            let (start, _) = identifier.info();
-            self.advance();
-            let mut arguments = Vec::new();
-            if let Some(_) = self.optional(&[")"]) {
-                let (_, end) = self.current().unwrap().info();
-                self.advance();
-                return Ok(Node::Call(Box::new(identifier), arguments, start, end))
-            }
-            arguments.push(self.parse_expression()?);
-            while let Some(_) = self.optional(&[","]) {
-                self.advance();
-                arguments.push(self.parse_expression()?);
-            }
-            if !self.optional(&[")"]).is_some() {
-                self.consume(&[")"])?;
-            }
-            let (_, end) = self.current().unwrap().info();
-            self.consume(&[")"])?;
-            return Ok(Node::Call(Box::new(identifier), arguments, start, end))
-        }
-        Ok(identifier)
     }
 
     fn parse_factor(&mut self) -> Result<Node, ParseError> {
