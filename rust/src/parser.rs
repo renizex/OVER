@@ -1,7 +1,7 @@
 use std::fmt::Write as FmtWrite;
 use crate::tokens::Token;
 use crate::nodes::Node;
-use crate::errors::{ParseError, error};
+use crate::errors::{error, ParseError};
 
 struct Parser {
     tokens: Vec<Token>,
@@ -219,7 +219,7 @@ impl Parser {
     }
 
     fn parse_term(&mut self) -> Result<Node, ParseError> {
-        let mut left: Node = self.parse_index()?;
+        let mut left: Node = self.parse_postfix()?;
         while let Some(operator) = self.optional(&["*", "/"]) {
             self.advance();
             let right: Node = self.parse_unary()?;
@@ -228,20 +228,39 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_index(&mut self) -> Result<Node, ParseError> {
-        let mut list: Node = self.parse_unary()?;
-        while let Some(_) = self.optional(&["["]) {
-            let (start, _) = self.current().unwrap().info();
+    fn parse_postfix(&mut self) -> Result<Node, ParseError> {
+        let mut prefix: Node = self.parse_unary()?;
+        while let Some(postfix) = self.optional(&["[", "."]) {
+            let start = self.current_index;
             self.advance();
-            let index = self.parse_index()?;
-            if !self.optional(&["]"]).is_some() {
+            if postfix.value() == "[" {
+                let index = self.parse_unary()?;
+                if !self.optional(&["]"]).is_some() {
+                    self.consume(&["]"])?;
+                }
+                let end = self.current_index;
                 self.consume(&["]"])?;
+                prefix = Node::Index(Box::new(prefix), Box::new(index), end, start);
             }
-            let (_, end) = self.current().unwrap().info();
-            self.consume(&["]"])?;
-            list = Node::Index(Box::new(list), Box::new(index), start, end);
+            else if postfix.value() == "." {
+                let mut object = Vec::new();
+                let method = self.parse_unary()?;
+                match &method {
+                    Node::Call(_, arguments, _, _) => {
+                        object.push(prefix);
+                        let mut count = 0;
+                        while count != arguments.len() {
+                            object.push(arguments[arguments.len() - 1].clone());
+                            count += 1;
+                        }
+                    }
+                    _ => return Err(ParseError::UnexpectedEndOfInput(String::from("expected method, got identifier.")))
+                }
+                let end = self.current_index;
+                prefix = Node::Call(Box::new(method), object, start, end)
+            }
         }
-        Ok(list)
+        Ok(prefix)
     }
 
     fn parse_unary(&mut self) -> Result<Node, ParseError> {
@@ -256,11 +275,11 @@ impl Parser {
     fn parse_call(&mut self) -> Result<Node, ParseError> {
         let identifier: Node = self.parse_factor()?;
         if let Some(_) = self.optional(&["("]) {
-            let start = self.current_index;
+            let (start, _) = identifier.info();
             self.advance();
             let mut arguments = Vec::new();
             if let Some(_) = self.optional(&[")"]) {
-                let end = self.current_index;
+                let (_, end) = self.current().unwrap().info();
                 self.advance();
                 return Ok(Node::Call(Box::new(identifier), arguments, start, end))
             }
@@ -269,8 +288,11 @@ impl Parser {
                 self.advance();
                 arguments.push(self.parse_expression()?);
             }
+            if !self.optional(&[")"]).is_some() {
+                self.consume(&[")"])?;
+            }
+            let (_, end) = self.current().unwrap().info();
             self.consume(&[")"])?;
-            let end = self.current_index;
             return Ok(Node::Call(Box::new(identifier), arguments, start, end))
         }
         Ok(identifier)

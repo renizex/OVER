@@ -62,7 +62,7 @@ impl Node {
             Node::Assignment(start, end, _, _) => start.to_owned() + "=" + &end.value(),
             Node::If(condition, body, _, _, _) => {"if ".to_owned() + &condition.value() + " {\n" + &body.value() + "\n" + "}"}
             Node::While(condition, body, _, _, _) => {"while ".to_owned() + &condition.value() + " {\n" + &body.value() + "\n" + "}"}
-            Node::Loop(body, _, _) => {"loop ".to_owned() + " {\n" + &body.value() + "\n" + "}"}
+            Node::Loop(body, _, _) => {"loop ".to_owned() + " {" + &body.value() + "}"}
             Node::Break(_, _) => String::from("break"),
             Node::Continue(_, _) => String::from("continue"),
             Node::Block(nodes, _, _) => {
@@ -74,8 +74,8 @@ impl Node {
                 result.push('}');
                 result
             }
-            Node::Function(identifier, _, body, _, _) => {identifier.value() + "(...)" + " {\n" + &*body.value() + " \n}"}
-            Node::Call(identifier, _, _, _) => {identifier.value() + "(...)" + " {\n" + " \n}"}
+            Node::Function(identifier, _, _, _, _) => identifier.value(),
+            Node::Call(identifier, _, _, _) => identifier.value(),
             Node::Return(_, _, _) => String::from("return"),
             Node::Index(list, index , _, _) => format!("{}[{}]", list.value(), index.value()),
         }

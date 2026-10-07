@@ -16,6 +16,8 @@ pub fn lex(expression: &str) -> Result<Vec<Token>, LexError> {
             '}' => tokens.push(Token::CloseBrace(index, index + 1)),
             '[' => tokens.push(Token::OpenBracket(index, index + 1)),
             ']' => tokens.push(Token::CloseBracket(index, index + 1)),
+            ',' => tokens.push(Token::Comma(index, index + 1)),
+            '.' => tokens.push(Token::Dot(index, index + 1)),
             '=' => {
                 if let Some(&(_, character)) = characters.peek() {
                     if character == '=' {
@@ -56,7 +58,6 @@ pub fn lex(expression: &str) -> Result<Vec<Token>, LexError> {
                     return Err(LexError::UnexpectedSymbol(error(expression, index, index  + 1, String::from("unexpected '!'."))))
                 }
             }
-            ',' => tokens.push(Token::Comma(index, index + 1)),
             character if character.is_whitespace() => continue,
             character if character.is_numeric() => {
                 let mut number: String = String::new();

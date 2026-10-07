@@ -63,7 +63,7 @@ impl Flow {
 
     pub fn type_name(&self) -> &str {
         match self {
-            Flow::Value(_) => "value",
+            Flow::Value(value) => value.type_name(),
             Flow::Break => "break",
             Flow::Continue => "continue",
             Flow::Return(_) => "return",
