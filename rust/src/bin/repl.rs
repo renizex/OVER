@@ -28,16 +28,14 @@ fn main() {
             Ok(node) => node,
             Err(error) => {println!("{error}\n"); continue}
         };
-        println!("\ntokens: {tokens:?}");
-        println!("ast: {node:?}");
-        let result = match interpreter::interpret(&node, &expression) {
-            Ok(result) => result,
-            Err(error) => {println!("{error}\n"); continue}
-        };
         if debug {
             println!("\ntokens: {tokens:?}");
             println!("ast: {node:?}");
         }
+        let result = match interpreter::interpret(&node, &expression) {
+            Ok(result) => result,
+            Err(error) => {println!("{error}\n"); continue}
+        };
         println!("{}\n", result.display());
     }
 }

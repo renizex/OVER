@@ -31,6 +31,7 @@ pub enum Token {
     Continue(usize, usize),
     Function(usize, usize),
     Return(usize, usize),
+    Class(usize, usize),
 }
 
 impl Token {
@@ -67,6 +68,7 @@ impl Token {
             Token::Continue(start, end) => (*start, *end),
             Token::Function(start, end) => (*start, *end),
             Token::Return(start, end) => (*start, *end),
+            Token::Class(start, end) => (*start, *end),
         }
     }
 
@@ -103,6 +105,7 @@ impl Token {
             Token::Continue(_, _) => String::from("continue"),
             Token::Function(_, _) => String::from("function"),
             Token::Return(_, _) => String::from("return"),
+            Token::Class(_, _) => String::from("class"),
         }
     }
 }

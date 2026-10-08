@@ -1,7 +1,9 @@
+use std::collections::HashMap;
 use crate::errors::InterpretError;
 use crate::nodes::Node;
 
 #[derive(Clone)]
+#[derive(Debug)]
 pub enum Flow {
     Value(Value),
     Break,
@@ -10,13 +12,14 @@ pub enum Flow {
 }
 
 #[derive(Clone)]
+#[derive(Debug)]
 pub enum Value {
+    Object(HashMap<String, Value>),
     Number(f64),
     Bool(bool),
     String(String),
     List(Vec<Flow>),
     Nothing,
-
 }
 
 impl Flow {
@@ -83,6 +86,7 @@ impl Flow {
 impl Value {
     pub fn type_name(&self) -> &str {
         match self {
+            Value::Object(_) => "object",
             Value::Number(_) => "number",
             Value::Bool(_) => "bool",
             Value::String(_) => "string",
@@ -93,6 +97,7 @@ impl Value {
 
     pub fn display(&self) -> String {
         match self {
+            Value::Object(value) => format!("{:?}", value),
             Value::Number(value) => value.to_string(),
             Value::Bool(value) => value.to_string(),
             Value::String(value) => value.clone(),

@@ -104,6 +104,7 @@ pub fn lex(expression: &str) -> Result<Vec<Token>, LexError> {
                     "continue" => tokens.push(Token::Continue(index, index + 8)),
                     "function" => tokens.push(Token::Function(index, index + 8)),
                     "return" => tokens.push(Token::Return(index, index + 6)),
+                    "class" => tokens.push(Token::Class(index, index + 5)),
                     _ => tokens.push(Token::Identifier(variable, index, length))
                 }
             }

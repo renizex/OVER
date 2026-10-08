@@ -147,6 +147,27 @@ impl Parser {
         Ok(Node::Function(Box::new(identifier), arguments, Box::new(body), start, end))
     }
 
+    fn parse_class(&mut self) -> Result<Node, ParseError> {
+        let (start, _) = self.current().unwrap().info();
+        self.advance();
+        let identifier = self.parse_factor()?;
+        self.consume(&["{"])?;
+        let mut fields = Vec::new();
+        while self.optional(&["}"]).is_none() {
+            let field = self.parse_factor()?;
+            match field {
+                Node::Identifier(_, _, _) => fields.push(field),
+                _=> {let (_, end) = self.current().unwrap().info(); return Err(ParseError::UnexpectedToken(error(&self.expression, start, end, format!("{} is invalid for class.", field.value()))))}
+            };
+        }
+        if self.optional(&["}"]).is_none() {
+            self.consume(&["}"])?;
+        }
+        let (_, end) = self.current().unwrap().info();
+        self.consume(&["}"])?;
+        Ok(Node::Class(Box::new(identifier), fields, start, end))
+    }
+
     fn parse_block(&mut self) -> Result<Node, ParseError> {
         self.consume(&["{"])?;
         let start = self.current_index;
@@ -167,6 +188,7 @@ impl Parser {
             Some(Token::Continue(start, end)) => {let (start, end) = (*start, *end); self.advance(); Ok(Node::Continue(start, end))},
             Some(Token::Function(_, _)) => self.parse_function(),
             Some(Token::Return(start, end)) => {let (start, end) = (*start, *end); self.advance(); if self.optional(&["}"]).is_some() {Ok(Node::Return(None, start, end))} else {let expression = self.parse_expression()?; Ok(Node::Return(Some(Box::new(expression)), start, end))}},
+            Some(Token::Class(_, _)) => self.parse_class(),
             _ => self.parse_assignment()
         }
     }
@@ -195,14 +217,6 @@ impl Parser {
         if let Some(operator) = self.optional(&[">", "<", "==", ">=", "<=", "!="]) {
             self.advance();
             let right: Node = self.parse_expression()?;
-            let left: Node = match &left {
-                Node::Identifier(_, _, _) => Ok(left),
-                Node::Number(_, _, _) => Ok(left),
-                Node::Binary(_, _, _) => Ok(left),
-                Node::String(_, _, _) => Ok(left),
-                Node::Bool(_, _, _) => Ok(left),
-                Node::Index(_, _, _, _) => Ok(left),
-                _ => {let (value, (start, end)) = (right.value(), right.info()); Err(ParseError::UnexpectedToken(error(&self.expression, start, end, format!("expected identifier, got '{value}'."))))} }?;
             return Ok(Node::Binary(Box::new(left), operator, Box::new(right)))
         }
         Ok(left)
@@ -239,10 +253,10 @@ impl Parser {
 
     fn parse_postfix(&mut self) -> Result<Node, ParseError> {
         let mut prefix: Node = self.parse_factor()?;
-        while let Some(postfix) = self.optional(&["[", ".", "("]) {
+        while let Some(postfix) = self.optional(&["[", ".", "(", "{"]) {
             let start = self.current_index;
-            self.advance();
             if postfix.value() == "[" {
+                self.advance();
                 let index = self.parse_factor()?;
                 if !self.optional(&["]"]).is_some() {
                     self.consume(&["]"])?;
@@ -252,26 +266,32 @@ impl Parser {
                 prefix = Node::Index(Box::new(prefix), Box::new(index), end, start);
             }
             else if postfix.value() == "." {
+                self.advance();
                 let mut object = Vec::new();
-                let identifier = match self.parse_postfix()? {
-                    Node::Call(identifier, arguments, _, _) => {
+                let postfix = self.parse_postfix()?;
+                match &postfix {
+                    Node::FunctionCall(identifier, arguments, _, _) => {
                         object.push(prefix);
                         for _ in 0..arguments.len() {
                             object.push(arguments[arguments.len() - 1].clone());
                         }
-                        identifier
-                    }
+                        let end = self.current_index;
+                        prefix = Node::FunctionCall(identifier.clone(), object, start, end)
+                    },
+                    Node::Identifier(_, _, _) => {
+                        let end = self.current_index;
+                        prefix = Node::Object(Box::new(prefix), Box::new(postfix), start, end);
+                    },
                     _ => return Err(ParseError::UnexpectedEndOfInput(String::from("expected method, got identifier.")))
                 };
-                let end = self.current_index;
-                prefix = Node::Call(identifier, object, start, end)
             }
             else if postfix.value() == "(" {
+                self.advance();
                 let mut arguments = Vec::new();
                 if let Some(_) = self.optional(&[")"]) {
                     let (_, end) = self.current().unwrap().info();
                     self.advance();
-                    return Ok(Node::Call(Box::new(prefix), arguments, start, end))
+                    return Ok(Node::FunctionCall(Box::new(prefix), arguments, start, end))
                 }
                 arguments.push(self.parse_expression()?);
                 while let Some(_) = self.optional(&[","]) {
@@ -283,7 +303,21 @@ impl Parser {
                 }
                 let (_, end) = self.current().unwrap().info();
                 self.consume(&[")"])?;
-                return Ok(Node::Call(Box::new(prefix), arguments, start, end))
+                return Ok(Node::FunctionCall(Box::new(prefix), arguments, start, end))
+            }
+            else if postfix.value() == "{" {
+                if !matches!(prefix.clone(), Node::Identifier(identifier, _, _) if identifier.chars().next().unwrap().is_uppercase()) {return Ok(prefix)}
+                self.advance();
+                let mut fields = Vec::new();
+                while self.optional(&["}"]).is_none() {
+                    fields.push(self.parse_expression()?);
+                }
+                if self.optional(&["}"]).is_none() {
+                    self.consume(&["}"])?;
+                }
+                let (_, end) = self.current().unwrap().info();
+                self.consume(&["}"])?;
+                prefix = Node::ClassCall(Box::new(prefix), fields, start, end)
             }
         }
         Ok(prefix)

@@ -7,13 +7,16 @@ use crate::flow::Value::Nothing;
 use crate::operations::*;
 
 pub fn interpret(node: &Node, expression: &str) -> Result<Flow, InterpretError> {
-    let mut scope = Scope{ local: HashMap::new(), parent: HashMap::new()};
+    let scope = Scope{ local: HashMap::new(), parent: HashMap::new()};
     let functions = HashMap::<String, Node>::new();
-    let mut interpret = Interpret{functions, expression: expression.to_string()};
-    interpret.evaluate(node, &mut scope)
+    let classes = HashMap::<String, Node>::new();
+    let mut interpret = Interpret{variables: scope.clone(), classes, functions, expression: expression.to_string()};
+    interpret.evaluate(node)
 }
 
 struct Interpret {
+    variables: Scope,
+    classes: HashMap<String, Node>,
     functions: HashMap<String, Node>,
     expression: String,
 }
@@ -35,15 +38,14 @@ impl Interpret {
         }
     }
 
-    fn evaluate(&mut self, node: &Node, variables: &mut Scope) -> Result<Flow, InterpretError> {
-        // println!("{:?}", node);
+    fn evaluate(&mut self, node: &Node) -> Result<Flow, InterpretError> {
         match node {
             Node::Number(value, _, _) => Ok(Flow::Value(Value::Number(*value))),
-            Node::Identifier(value, _, _) => Ok(resolve_variable(variables, value)?),
+            Node::Identifier(value, _, _) => Ok(resolve_variable(&self.variables, value)?),
             Node::String(value, _, _) => Ok(Flow::Value(Value::String(value.clone()))),
             Node::Binary(left, operator, right) => {
-                let left: Flow = self.evaluate(left, variables)?;
-                let right: Flow = self.evaluate(right, variables)?;
+                let left: Flow = self.evaluate(left)?;
+                let right: Flow = self.evaluate(right)?;
                 if left.option_return() {
                     return Ok(left)
                 }
@@ -53,17 +55,17 @@ impl Interpret {
                 self.binary(left, operator, right, node)
             }
             Node::Assignment(variable, expression, _, _) => {
-                let expression: Flow = self.evaluate(expression, variables)?;
-                variables.set(variable.clone(), expression.clone());
+                let expression: Flow = self.evaluate(expression)?;
+                self.variables.set(variable.clone(), expression.clone());
                 Ok(expression)
             }
             Node::If(condition, body, elsebody, _, _) => {
-                if self.evaluate(condition, variables)?.expect_bool()? {
-                    self.evaluate(body, variables)
+                if self.evaluate(condition)?.expect_bool()? {
+                    self.evaluate(body)
                 }
                 else {
                     if let Some(node) = elsebody {
-                        return self.evaluate(node, variables)
+                        return self.evaluate(node)
                     }
                     Ok(Flow::Value(Nothing))
                 }
@@ -71,11 +73,11 @@ impl Interpret {
             Node::While(condition, body, elsebody, _, _) => {
                 let mut last_result: Flow = Flow::Value(Nothing);
                 let mut count: i32 = 0;
-                while self.evaluate(condition, variables)?.expect_bool()? {
+                while self.evaluate(condition)?.expect_bool()? {
                     if count >= 1000000 {
                         return Err(InterpretError::ExecutionLimit(String::from("ERROR: execution limit exceed.")))
                     }
-                    let result: Flow = self.evaluate(body, variables)?;
+                    let result: Flow = self.evaluate(body)?;
                     count += 1;
                     if result.option_break() {
                         return Ok(Flow::Value(Nothing))
@@ -89,7 +91,7 @@ impl Interpret {
                     last_result = result
                 }
                 if let Some(node) = elsebody {
-                    last_result = self.evaluate(node, variables)?
+                    last_result = self.evaluate(node)?
                 }
                 Ok(last_result)
             }
@@ -99,7 +101,7 @@ impl Interpret {
                     if count >= 1000000 {
                         return Err(InterpretError::ExecutionLimit(String::from("ERROR: execution limit exceed.")))
                     }
-                    let result: Flow = self.evaluate(body, variables)?;
+                    let result: Flow = self.evaluate(body)?;
                     count += 1;
                     if result.option_break() {
                         return Ok(Flow::Value(Nothing))
@@ -117,7 +119,7 @@ impl Interpret {
             Node::Block(nodes, _, _) => {
                 let mut result = Flow::Value(Nothing);
                 for node in nodes {
-                    result = self.evaluate(node, variables)?;
+                    result = self.evaluate(node)?;
                     if result.option_break() {
                         return Ok(Flow::Break)
                     }
@@ -132,14 +134,14 @@ impl Interpret {
             }
             Node::Bool(bool, _, _) => {let bool = *bool; Ok(Flow::Value(Value::Bool(bool)))},
             Node::UnaryMinus(node) => {
-                let number: f64 = self.evaluate(node, variables)?.expect_number()?;
+                let number: f64 = self.evaluate(node)?.expect_number()?;
                 Ok(Flow::Value(Value::Number(unary_minus(number))))
             }
             Node::Function(identifier, _, _, _, _) => {
                 self.functions.insert(identifier.value(), node.clone());
                 Ok(Flow::Value(Nothing))
             }
-            Node::Call(identifier, arguments, start, end) => {
+            Node::FunctionCall(identifier, arguments, start, end) => {
                 if &identifier.value() == "append" {
                     if arguments.len() > 2 {
                         let (start, end) = identifier.info(); return Err(InterpretError::InvalidCall(error(&self.expression, start, end, format!("expected 1 arguments, got {}.", arguments.len() - 1))))
@@ -148,19 +150,19 @@ impl Interpret {
                         let (start, end) = arguments[0].info(); return Err(InterpretError::InvalidCall(error(&self.expression, start + 8, end + 9, String::from("expected 1 argument, got 0."))))
                     }
                     let mut god = arguments.clone();
-                    let victim = self.evaluate(&god.pop().unwrap(), variables)?;
+                    let victim = self.evaluate(&god.pop().unwrap())?;
                     let (list, identifier) = match god.pop() {
                         Some(list) => match list.clone() {
-                            Node::Identifier(variable, _, _) => match self.evaluate(&list, variables)? {
+                            Node::Identifier(variable, _, _) => match self.evaluate(&list)? {
                                 Flow::Value(Value::List(mut list)) => {list.push(victim); (Node::List(convert(list), 0, 0), variable)},
-                                _ => {let (start, end) = identifier.info(); return Err(InterpretError::InvalidCall(error(&self.expression.clone(), start - 1, end, format!("expected list, got {}.", self.evaluate(&list, variables)?.type_name()))))}
+                                _ => {let (start, end) = identifier.info(); return Err(InterpretError::InvalidCall(error(&self.expression.clone(), start - 1, end, format!("expected list, got {}.", self.evaluate(&list)?.type_name()))))}
                             },
                             Node::List(_, _, _) => {let (start, end) = &identifier.info(); return Err(InterpretError::InvalidCall(error(&self.expression, *start, *end, String::from("why would you even append to this."))))},
-                            _ => {let (start, end) = identifier.info(); return Err(InterpretError::InvalidCall(error(&self.expression.clone(), start, end, format!("can't append to {}.", self.evaluate(&list, variables)?.type_name()))))}
+                            _ => {let (start, end) = identifier.info(); return Err(InterpretError::InvalidCall(error(&self.expression.clone(), start, end, format!("can't append to {}.", self.evaluate(&list)?.type_name()))))}
                         },
                         _ => unreachable!()
                     };
-                    self.evaluate(&Node::Assignment(identifier, Box::new(list), 0, 0), variables)?;
+                    self.evaluate(&Node::Assignment(identifier, Box::new(list), 0, 0))?;
                     return Ok(Flow::Value(Nothing))
                 }
                 if &identifier.value() == "pop" {
@@ -170,9 +172,9 @@ impl Interpret {
                     let mut god = arguments.clone();
                     let (variable, identifier, list) = match god.pop() {
                         Some(list) => match list.clone() {
-                            Node::Identifier(identifier, _, _) => (list.clone(), identifier, self.evaluate(&list, variables)?),
+                            Node::Identifier(identifier, _, _) => (list.clone(), identifier, self.evaluate(&list)?),
                             Node::List(_, _, _) => {let (start, end) = &identifier.info(); return Err(InterpretError::InvalidCall(error(&self.expression, *start, *end, String::from("why would you even pop from this."))))},
-                            _ => {let (start, end) = identifier.info(); return Err(InterpretError::InvalidCall(error(&self.expression.clone(), start - 1, end, format!("expected list, got {}.", self.evaluate(&list, variables)?.type_name()))))}
+                            _ => {let (start, end) = identifier.info(); return Err(InterpretError::InvalidCall(error(&self.expression.clone(), start - 1, end, format!("expected list, got {}.", self.evaluate(&list)?.type_name()))))}
                         },
                         None => {let (start, end) = arguments[0].info(); return Err(InterpretError::InvalidCall(error(&self.expression, start + 8, end + 9, String::from("what."))))}
                     };
@@ -180,7 +182,7 @@ impl Interpret {
                         Flow::Value(Value::List(mut list)) => (list.pop().unwrap_or_else(|| Flow::Value(Nothing)), Node::List(convert(list), 0, 0)),
                         _ => {let (start, end) = variable.info(); return Err(InterpretError::InvalidCall(error(&self.expression, start, end + 6, format!("expected list, got {}.", list.type_name()))))}
                     };
-                    self.evaluate(&Node::Assignment(identifier, Box::new(list), 0, 0), variables)?;
+                    self.evaluate(&Node::Assignment(identifier, Box::new(list), 0, 0))?;
                     return Ok(pop)
                 }
                 match self.functions.get(&identifier.value()).cloned() {
@@ -192,14 +194,14 @@ impl Interpret {
                             let mut local = HashMap::new();
                             for (parameter, argument) in parameters.iter().zip(arguments.iter()) {
                                 let parameter = parameter.value();
-                                let argument = self.evaluate(argument, variables)?;
+                                let argument = self.evaluate(argument)?;
                                 local.insert(parameter, argument);
                             }
-                            let mut scope = Scope{local, parent: variables.parent.clone()};
-                            match self.evaluate(&body.clone(), &mut scope)? {
+                            self.variables = Scope{local, parent: self.variables.parent.clone()};
+                            match self.evaluate(&body.clone())? {
                                 Flow::Return(expression) => {
                                     if expression.is_some() {
-                                        return self.evaluate(&expression.unwrap(), &mut scope)
+                                        return self.evaluate(&expression.unwrap())
                                     }
                                     Ok(Flow::Value(Nothing))
                                 }
@@ -218,13 +220,13 @@ impl Interpret {
             Node::List(list, _, _) => {
                 let mut result = Vec::new();
                 for node in list {
-                    result.push(self.evaluate(node, variables)?)
+                    result.push(self.evaluate(node)?)
                 }
                 Ok(Flow::Value(Value::List(result)))
             }
             Node::Index(identifier, index, start, end) => {
-                let flow = self.evaluate(identifier, variables)?;
-                let index = self.evaluate(index, variables)?;
+                let flow = self.evaluate(identifier)?;
+                let index = self.evaluate(index)?;
                 match &flow {
                     Flow::Value(Value::List(list)) => match index {
                         Flow::Value(Value::Number(index)) => {
@@ -247,6 +249,46 @@ impl Interpret {
                     _ => {let (start, end) = (start - flow.display().len(), *start); Err(InterpretError::InvalidVariable(error(&self.expression, start, end, format!("'{}' is not a list.", flow.display()))))}
                 }
             },
+            Node::Class(identifier, _, _, _) => {
+                self.classes.insert(identifier.value(), node.clone());
+                Ok(Flow::Value(Nothing))
+            }
+            Node::ClassCall(identifier, fields, start, end) => {
+                let mut chlenosos = HashMap::new();
+                match self.classes.get(&identifier.value()) {
+                    Some(class) => match class.clone() {
+                        Node::Class(_, shit, _, _) => {
+                            if fields.len() != shit.len() {
+                                return Err(InterpretError::InvalidCall(error(&self.expression, *start, *end, format!("expected {} arguments, got {}.\n{:?}", shit.len(), fields.len(), fields))))
+                            }
+                            for (shit, field) in shit.iter().zip(fields.iter()) {
+                                let field = match self.evaluate(&field)? {
+                                    Flow::Value(value) => value,
+                                    _=> return Err(InterpretError::InvalidCall("пошел нахуй отсюда.".to_string()))
+                                };
+                                chlenosos.insert(shit.value(), field);
+                            }
+                            self.variables.set(identifier.value(), Flow::Value(Value::Object(chlenosos.clone())));
+                        },
+                        _=> unreachable!()
+                    },
+                    None => {let (start, end) = identifier.info(); return Err(InterpretError::InvalidCall(error(&self.expression, start, end, format!("class {} does not exist.", identifier.value()))))}
+                };
+                Ok(Flow::Value(Value::Object(chlenosos)))
+            }
+            Node::Object(identifier, field, _, _) => {
+                let _ = self.evaluate(identifier);
+                match self.variables.get(identifier.value()) {
+                    Some(object) => match object {
+                        Flow::Value(Value::Object(object)) => match object.get(&field.value()) {
+                            Some(value) => Ok(Flow::Value(value.clone())),
+                            _=> unreachable!()
+                        }
+                        _=> {println!("{:?}", object.type_name()); unreachable!()}
+                    }
+                    None => unreachable!()
+                }
+            }
         }
     }
 }
@@ -277,6 +319,8 @@ fn resolve_variable(variables: &Scope, variable: &str) -> Result<Flow, Interpret
     }
 }
 
+#[derive(Debug)]
+#[derive(Clone)]
 struct Scope {
     local: HashMap<String, Flow>,
     parent: HashMap<String, Flow>,

@@ -17,9 +17,12 @@ pub enum Node {
     Block(Vec<Node>, usize, usize),
     Continue(usize, usize),
     Function(Box<Node>, Vec<Node>, Box<Node>, usize, usize),
-    Call(Box<Node>, Vec<Node>, usize, usize),
+    FunctionCall(Box<Node>, Vec<Node>, usize, usize),
     Return(Option<Box<Node>>, usize, usize),
     Index(Box<Node>, Box<Node>, usize, usize),
+    Class(Box<Node>, Vec<Node>, usize, usize),
+    ClassCall(Box<Node>, Vec<Node>, usize, usize),
+    Object(Box<Node>, Box<Node>, usize, usize),
 }
 
 impl Node {
@@ -44,9 +47,12 @@ impl Node {
             Node::Block(_, start, end) => (*start, *end),
             Node::Continue(start, end) => (*start, *end),
             Node::Function(_, _, _, start, end) => (*start, *end),
-            Node::Call(_, _, start, end) => (*start, *end),
+            Node::FunctionCall(_, _, start, end) => (*start, *end),
             Node::Return(_, start, end) => (*start, *end),
             Node::Index(_, _, start, end) => (*start, *end),
+            Node::Class(_, _, start, end) => (*start, *end),
+            Node::ClassCall(_, _, start, end) => (*start, *end),
+            Node::Object(_, _, start, end) => (*start, *end),
         }
     }
 
@@ -75,9 +81,12 @@ impl Node {
                 result
             }
             Node::Function(identifier, _, _, _, _) => identifier.value(),
-            Node::Call(identifier, _, _, _) => identifier.value(),
+            Node::FunctionCall(identifier, _, _, _) => identifier.value(),
             Node::Return(_, _, _) => String::from("return"),
             Node::Index(list, index , _, _) => format!("{}[{}]", list.value(), index.value()),
+            Node::Class(identifier, fields , _, _) => {let vector: Vec<String> = fields.iter().map(|x| x.value()).collect(); format!("{} {{{}", identifier.value(), vector.join(" "))},
+            Node::ClassCall(identifier, _ , _, _) => identifier.value(),
+            Node::Object(identifier, _, _, _) => identifier.value()
         }
     }
 }
