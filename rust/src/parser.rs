@@ -52,8 +52,8 @@ impl Parser {
         }
         if let Some(token) = self.current().cloned() {
             let value: String = match token {
-                Token::Number(value, start, end) => return Err(ParseError::UnexpectedToken(error(&self.expression, start, end, format!("unexpected number '{value}'.")))),
-                Token::Identifier(value, start, end) => return Err(ParseError::UnexpectedToken(error(&self.expression, start, end, format!("unexpected identifier '{value}'")))),
+                Token::Number(value, start, end) => return Err(ParseError::UnexpectedToken(error(&self.expression, &start, &end, format!("unexpected number '{value}'.")))),
+                Token::Identifier(value, start, end) => return Err(ParseError::UnexpectedToken(error(&self.expression, &start, &end, format!("unexpected identifier '{value}'")))),
                 _ => token.value()
             };
             if expected.contains(&&*value) {
@@ -63,11 +63,11 @@ impl Parser {
             else {
                 let value = token.value();
                 let (start, end) = token.info();
-                Err(ParseError::UnexpectedToken(error(&self.expression, start, end, format!("expected {display}got '{value}'."))))
+                Err(ParseError::UnexpectedToken(error(&self.expression, &start, &end, format!("expected {display}got '{value}'."))))
             }
         }
         else {
-            Err(ParseError::UnexpectedEndOfInput(error(&self.expression, self.expression.chars().count() - 2, self.expression.chars().count() - 1, format!("expected {display}got end of input."))))
+            Err(ParseError::UnexpectedEndOfInput(error(&self.expression, &(self.expression.chars().count() - 2), &(self.expression.chars().count() - 1), format!("expected {display}got end of input."))))
         }
     }
 
@@ -75,12 +75,12 @@ impl Parser {
         let start = self.current_index;
         self.advance();
         if self.current().is_none() {
-            return Err(ParseError::UnexpectedEndOfInput(error(&self.expression, start, self.current_index + 2, String::from("expected expression, got nothing.\n    try: if 10 > 5 {10 * 5}"))))
+            return Err(ParseError::UnexpectedEndOfInput(error(&self.expression, &start, &(self.current_index + 2), String::from("expected expression, got nothing.\n    try: if 10 > 5 {10 * 5}"))))
         }
         let condition: Node = self.parse_statement()?;
         if self.current().is_none() {
             let (start, end) = condition.info();
-            return Err(ParseError::UnexpectedEndOfInput(error(&self.expression, start, end + 2, String::from("unclosed brace inside of 'if' statement."))))
+            return Err(ParseError::UnexpectedEndOfInput(error(&self.expression, &start, &(end + 2), String::from("unclosed brace inside of 'if' statement."))))
         }
         let body: Node = self.parse_block()?;
         if let Some(_) =  self.optional(&["else"]) {
@@ -95,12 +95,12 @@ impl Parser {
         let start: usize = self.current_index;
         self.advance();
         if self.current().is_none() {
-            return Err(ParseError::UnexpectedEndOfInput(error(&self.expression, start, self.current_index + 5, String::from("expected expression, got nothing.\n    try: x = 5 while x < 100 {x = x + 5}"))))
+            return Err(ParseError::UnexpectedEndOfInput(error(&self.expression, &start, &(self.current_index + 5), String::from("expected expression, got nothing.\n    try: x = 5 while x < 100 {x = x + 5}"))))
         }
         let condition: Node = self.parse_statement()?;
         if self.current().is_none() {
             let (start, end) = condition.info();
-            return Err(ParseError::UnexpectedEndOfInput(error(&self.expression, start, end + 2, String::from("unclosed brace inside of 'while' statement."))))
+            return Err(ParseError::UnexpectedEndOfInput(error(&self.expression, &start, &(end + 2), String::from("unclosed brace inside of 'while' statement."))))
         }
         let body: Node = self.parse_block()?;
         if let Some(_) =  self.optional(&["else"]) {
@@ -124,7 +124,7 @@ impl Parser {
         let identifier: Node = self.parse_factor()?;
         if !matches!(identifier, Node::Identifier(_, _, _)) {
             let (start, end) = identifier.info();
-            return Err(ParseError::UnexpectedToken(error(&self.expression, start, end, format!("expected identifier, got {}.", identifier.value()))))
+            return Err(ParseError::UnexpectedToken(error(&self.expression, &start, &end, format!("expected identifier, got {}.", identifier.value()))))
         }
         self.consume(&["("])?;
         let mut arguments = Vec::new();
@@ -157,7 +157,7 @@ impl Parser {
             let field = self.parse_factor()?;
             match field {
                 Node::Identifier(_, _, _) => fields.push(field),
-                _=> {let (_, end) = self.current().unwrap().info(); return Err(ParseError::UnexpectedToken(error(&self.expression, start, end, format!("{} is invalid for class.", field.value()))))}
+                _=> {let (start, end) = field.info(); return Err(ParseError::UnexpectedToken(error(&self.expression, &start, &end, format!("'{}' can not be attribute.", field.value()))))}
             };
         }
         if self.optional(&["}"]).is_none() {
@@ -203,7 +203,7 @@ impl Parser {
                 _ => {
                     let value: String = left.value();
                     let (start, end) = left.info();
-                    Err(ParseError::UnexpectedToken(error(&self.expression, start, end, format!("expected identifier, got '{value}'."))))
+                    Err(ParseError::UnexpectedToken(error(&self.expression, &start, &end, format!("expected identifier, got '{value}'."))))
                 },
             }?;
             let (_, end) = right.info();
@@ -254,36 +254,16 @@ impl Parser {
     fn parse_postfix(&mut self) -> Result<Node, ParseError> {
         let mut prefix: Node = self.parse_factor()?;
         while let Some(postfix) = self.optional(&["[", ".", "(", "{"]) {
-            let start = self.current_index;
+            let (start, _) = self.current().unwrap().info();
             if postfix.value() == "[" {
                 self.advance();
                 let index = self.parse_factor()?;
                 if !self.optional(&["]"]).is_some() {
                     self.consume(&["]"])?;
                 }
-                let end = self.current_index;
+                let (_, end) = self.current().unwrap().info();
                 self.consume(&["]"])?;
-                prefix = Node::Index(Box::new(prefix), Box::new(index), end, start);
-            }
-            else if postfix.value() == "." {
-                self.advance();
-                let mut object = Vec::new();
-                let postfix = self.parse_postfix()?;
-                match &postfix {
-                    Node::FunctionCall(identifier, arguments, _, _) => {
-                        object.push(prefix);
-                        for _ in 0..arguments.len() {
-                            object.push(arguments[arguments.len() - 1].clone());
-                        }
-                        let end = self.current_index;
-                        prefix = Node::FunctionCall(identifier.clone(), object, start, end)
-                    },
-                    Node::Identifier(_, _, _) => {
-                        let end = self.current_index;
-                        prefix = Node::Object(Box::new(prefix), Box::new(postfix), start, end);
-                    },
-                    _ => return Err(ParseError::UnexpectedEndOfInput(String::from("expected method, got identifier.")))
-                };
+                prefix = Node::Index(Box::new(prefix.clone()), Box::new(index), end, start);
             }
             else if postfix.value() == "(" {
                 self.advance();
@@ -319,6 +299,39 @@ impl Parser {
                 self.consume(&["}"])?;
                 prefix = Node::ClassCall(Box::new(prefix), fields, start, end)
             }
+            while self.optional(&["."]).is_some() {
+                self.advance();
+                let mut object = Vec::new();
+                let postfix = self.parse_factor()?;
+                if self.optional(&["("]).is_some() {
+                    self.advance();
+                    let mut arguments = Vec::new();
+                    if let Some(_) = self.optional(&[")"]) {
+                        let (_, end) = self.current().unwrap().info();
+                        self.advance();
+                        return Ok(Node::FunctionCall(Box::new(postfix), vec![prefix], start, end))
+                    }
+                    arguments.push(self.parse_expression()?);
+                    while let Some(_) = self.optional(&[","]) {
+                        self.advance();
+                        arguments.push(self.parse_expression()?);
+                    }
+                    if !self.optional(&[")"]).is_some() {
+                        self.consume(&[")"])?;
+                    }
+                    let (_, end) = self.current().unwrap().info();
+                    self.consume(&[")"])?;
+                    object.push(prefix.clone());
+                    for _ in 0..arguments.len() {
+                        object.push(arguments[arguments.len() - 1].clone());
+                    }
+                    prefix = Node::FunctionCall(Box::new(postfix), object, start, end)
+                }
+                else {
+                    let end = self.current_index;
+                    prefix = Node::Object(Box::new(prefix), Box::new(postfix), start, end);
+                }
+            }
         }
         Ok(prefix)
     }
@@ -342,8 +355,9 @@ impl Parser {
                         self.advance();
                         list.push(self.parse_factor()?)
                     }
+                    let (_, end) = self.current().unwrap().info();
                     self.consume(&["]"])?;
-                    Ok(Node::List(list, start, start + 1))
+                    Ok(Node::List(list, start, end))
                 },
                 Token::Bool(bool, start, end) => {let (bool, start, end) = (*bool, *start, *end); self.advance(); Ok(Node::Bool(bool, start, end))},
                 Token::OpenParenthesis(_, _) => {
@@ -352,11 +366,11 @@ impl Parser {
                     self.consume(&[")"])?;
                     Ok(expression)
                 }
-                _ => {let (value, (start, end)) = (token.value(), token.info()); Err(ParseError::UnexpectedToken(error(&self.expression, start, end, format!("unexpected '{value}'."))))},
+                _ => {let (value, (start, end)) = (token.value(), token.info()); Err(ParseError::UnexpectedToken(error(&self.expression, &start, &end, format!("unexpected '{value}'."))))},
             }
         }
         else {
-            Err(ParseError::UnexpectedToken(error(&self.expression, self.current_index + 1, self.current_index + 2, String::from("expected number or variable, got nothing."))))
+            Err(ParseError::UnexpectedToken(error(&self.expression, &(self.current_index + 1), &(self.current_index + 2), String::from("expected number or variable, got nothing."))))
         }
     }
 }

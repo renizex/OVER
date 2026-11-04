@@ -34,7 +34,7 @@ impl Interpret {
             Token::GreaterEqual(_, _) => {let a: f64 = left.expect_number()?; let b: f64 = right.expect_number()?;  Ok(Flow::Value(Value::Bool(greaterequal(a, b))))},
             Token::LessEqual(_, _) => {let a: f64 = left.expect_number()?; let b: f64 = right.expect_number()?;  Ok(Flow::Value(Value::Bool(lessequal(a, b))))},
             Token::NotEqual(_, _) => {Ok(Flow::Value(Value::Bool(!equal(left, right)?)))},
-            _ => {let (value, (start, end)) = (&node.value(), &node.info()); Err(InterpretError::InvalidOperator(error(&self.expression, *start, *end, format!("unknown operator '{value}'."))))}
+            _ => {let (value, (start, end)) = (&node.value(), &node.info()); Err(InterpretError::InvalidOperator(error(&self.expression, start, end, format!("unknown operator '{value}'."))))}
         }
     }
 
@@ -143,53 +143,53 @@ impl Interpret {
             }
             Node::FunctionCall(identifier, arguments, start, end) => {
                 if &identifier.value() == "append" {
-                    if arguments.len() > 2 {
-                        let (start, end) = identifier.info(); return Err(InterpretError::InvalidCall(error(&self.expression, start, end, format!("expected 1 arguments, got {}.", arguments.len() - 1))))
-                    }
-                    else if arguments.len() == 1 {
-                        let (start, end) = arguments[0].info(); return Err(InterpretError::InvalidCall(error(&self.expression, start + 8, end + 9, String::from("expected 1 argument, got 0."))))
+                    if arguments.len() != 2 {
+                        let (start, end) = identifier.info(); return Err(InterpretError::InvalidCall(error(&self.expression, &start, &end, format!("expected 1 arguments, got {}.", arguments.len() - 1))))
                     }
                     let mut god = arguments.clone();
-                    let victim = self.evaluate(&god.pop().unwrap())?;
-                    let (list, identifier) = match god.pop() {
-                        Some(list) => match list.clone() {
-                            Node::Identifier(variable, _, _) => match self.evaluate(&list)? {
-                                Flow::Value(Value::List(mut list)) => {list.push(victim); (Node::List(convert(list), 0, 0), variable)},
-                                _ => {let (start, end) = identifier.info(); return Err(InterpretError::InvalidCall(error(&self.expression.clone(), start - 1, end, format!("expected list, got {}.", self.evaluate(&list)?.type_name()))))}
-                            },
-                            Node::List(_, _, _) => {let (start, end) = &identifier.info(); return Err(InterpretError::InvalidCall(error(&self.expression, *start, *end, String::from("why would you even append to this."))))},
-                            _ => {let (start, end) = identifier.info(); return Err(InterpretError::InvalidCall(error(&self.expression.clone(), start, end, format!("can't append to {}.", self.evaluate(&list)?.type_name()))))}
-                        },
-                        _ => unreachable!()
+                    let argument = god.pop().unwrap();
+                    let (list, list_identifier) = match god.pop() {
+                        Some(node) => {
+                            match node.clone() {
+                                Node::Identifier(identifier, _, _) => {
+                                    let mut list = match self.evaluate(&node)? {
+                                        Flow::Value(Value::List(list)) => convert(list),
+                                        _ => unreachable!()
+                                    };
+                                    list.push(argument);
+                                    (list, identifier)
+                                },
+                                Node::Index(identifier, index, _, _) => {
+                                    let mut indices = vec![*index];
+                                    self.recursive_append(&identifier, &mut indices, argument)?
+                                },
+                                _=> unreachable!()
+                            }
+                        }
+                        _=> unreachable!()
                     };
-                    self.evaluate(&Node::Assignment(identifier, Box::new(list), 0, 0))?;
+                    self.evaluate(&Node::Assignment(list_identifier, Box::new(Node::List(list, 0, 0)), 0, 0))?;
                     return Ok(Flow::Value(Nothing))
                 }
                 if &identifier.value() == "pop" {
                     if arguments.len() > 1 {
-                        let (start, end) = identifier.info(); return Err(InterpretError::InvalidCall(error(&self.expression, start, end, format!("expected 0 arguments, got {}.", arguments.len() - 1))))
+                        let (start, end) = identifier.info(); return Err(InterpretError::InvalidCall(error(&self.expression, &start, &end, format!("expected 0 arguments, got {}.", arguments.len() - 1))))
                     }
-                    let mut god = arguments.clone();
-                    let (variable, identifier, list) = match god.pop() {
-                        Some(list) => match list.clone() {
-                            Node::Identifier(identifier, _, _) => (list.clone(), identifier, self.evaluate(&list)?),
-                            Node::List(_, _, _) => {let (start, end) = &identifier.info(); return Err(InterpretError::InvalidCall(error(&self.expression, *start, *end, String::from("why would you even pop from this."))))},
-                            _ => {let (start, end) = identifier.info(); return Err(InterpretError::InvalidCall(error(&self.expression.clone(), start - 1, end, format!("expected list, got {}.", self.evaluate(&list)?.type_name()))))}
-                        },
-                        None => {let (start, end) = arguments[0].info(); return Err(InterpretError::InvalidCall(error(&self.expression, start + 8, end + 9, String::from("what."))))}
+                    let ((popped, list), identifier) =  {
+                        self.recursive_pop(arguments[0].clone(), &mut Vec::new())?
                     };
-                    let (pop, list) = match list {
-                        Flow::Value(Value::List(mut list)) => (list.pop().unwrap_or_else(|| Flow::Value(Nothing)), Node::List(convert(list), 0, 0)),
-                        _ => {let (start, end) = variable.info(); return Err(InterpretError::InvalidCall(error(&self.expression, start, end + 6, format!("expected list, got {}.", list.type_name()))))}
+                    let popped = match popped {
+                        Some(some) => self.evaluate(&some)?,
+                        None => Flow::Value(Nothing)
                     };
-                    self.evaluate(&Node::Assignment(identifier, Box::new(list), 0, 0))?;
-                    return Ok(pop)
+                    self.evaluate(&Node::Assignment(identifier, Box::new(Node::List(list, 0, 0)), 0, 0))?;
+                    return Ok(popped)
                 }
                 match self.functions.get(&identifier.value()).cloned() {
                     Some(value) => match value {
                         Node::Function(_, parameters, body, _, _) => {
                             if arguments.len() != parameters.len() {
-                                return Err(InterpretError::InvalidCall(error(&self.expression, *start, *end, format!("expected {} arguments, got {}.", parameters.len(), arguments.len()))))
+                                return Err(InterpretError::InvalidCall(error(&self.expression, start, end, format!("expected {} arguments, got {}.", parameters.len(), arguments.len()))))
                             }
                             let mut local = HashMap::new();
                             for (parameter, argument) in parameters.iter().zip(arguments.iter()) {
@@ -210,7 +210,7 @@ impl Interpret {
                         }
                         _ => unreachable!()
                     },
-                    None => {let (start, end) = identifier.info(); Err(InterpretError::InvalidVariable(error(&self.expression, start, end, format!("function '{}' does not exist.", identifier.value()))))}
+                    None => {let (start, end) = identifier.info(); Err(InterpretError::InvalidVariable(error(&self.expression, &start, &end, format!("function '{}' does not exist.", identifier.value()))))}
                 }
             }
             Node::Return(expression, _, _) => {
@@ -231,22 +231,22 @@ impl Interpret {
                     Flow::Value(Value::List(list)) => match index {
                         Flow::Value(Value::Number(index)) => {
                             if index.fract() != 0.0 {
-                                {let (start, end) = (*start, *end); Err(InterpretError::InvalidVariable(error(&self.expression, start, end, format!("index '{index}' is invalid. try '0'."))))}
+                                {let (start, end) = (*start, *end); Err(InterpretError::InvalidVariable(error(&self.expression, &start, &end, format!("index '{index}' is invalid. try '0'."))))}
                             }
                             else if index < 0.0 {
-                                {let (start, end) = (*start, *end); Err(InterpretError::InvalidVariable(error(&self.expression, start, end, String::from("index can not be negative."))))}
+                                {let (start, end) = (*start, *end); Err(InterpretError::InvalidVariable(error(&self.expression, &start, &end, String::from("index can not be negative."))))}
                             }
                             else {
                                 let index: usize = index as usize;
                                 match list.get(index) {
-                                    Some(shit) => Ok(shit.clone()),
-                                    None => {let (start, end) = (*start, *end); Err(InterpretError::InvalidVariable(error(&self.expression, start, end, format!("index '{index}' out of range."))))}
+                                    Some(value) => Ok(value.clone()),
+                                    None => {let (start, end) = (*start, *end); Err(InterpretError::InvalidVariable(error(&self.expression, &start, &end, format!("index '{index}' out of range."))))}
                                 }
                             }
                         }
-                        _ => {let (start, end) = (*start, *end); Err(InterpretError::InvalidVariable(error(&self.expression, start, end, String::from("index can only be integer."))))}
+                        _ => {let (start, end) = (*start, *end); Err(InterpretError::InvalidVariable(error(&self.expression, &start, &end, String::from("index can only be integer."))))}
                     },
-                    _ => {let (start, end) = (start - flow.display().len(), *start); Err(InterpretError::InvalidVariable(error(&self.expression, start, end, format!("'{}' is not a list.", flow.display()))))}
+                    _ => {let (start, end) = (start - flow.display().len(), *start); Err(InterpretError::InvalidVariable(error(&self.expression, &start, &end, format!("'{}' is not a list.", flow.display()))))}
                 }
             },
             Node::Class(identifier, _, _, _) => {
@@ -254,48 +254,139 @@ impl Interpret {
                 Ok(Flow::Value(Nothing))
             }
             Node::ClassCall(identifier, fields, start, end) => {
-                let mut chlenosos = HashMap::new();
+                let mut objects = HashMap::new();
                 match self.classes.get(&identifier.value()) {
                     Some(class) => match class.clone() {
-                        Node::Class(_, shit, _, _) => {
-                            if fields.len() != shit.len() {
-                                return Err(InterpretError::InvalidCall(error(&self.expression, *start, *end, format!("expected {} arguments, got {}.\n{:?}", shit.len(), fields.len(), fields))))
+                        Node::Class(_, arguments, _, _) => {
+                            if fields.len() != arguments.len() {
+                                return Err(InterpretError::InvalidCall(error(&self.expression, start, end, format!("expected {} arguments, got {}.\n{:?}", arguments.len(), fields.len(), fields))))
                             }
-                            for (shit, field) in shit.iter().zip(fields.iter()) {
-                                let field = match self.evaluate(&field)? {
-                                    Flow::Value(value) => value,
-                                    _=> return Err(InterpretError::InvalidCall("пошел нахуй отсюда.".to_string()))
-                                };
-                                chlenosos.insert(shit.value(), field);
+                            for (arguments, field) in arguments.iter().zip(fields.iter()) {
+                                objects.insert(arguments.value(), field.clone());
                             }
-                            self.variables.set(identifier.value(), Flow::Value(Value::Object(chlenosos.clone())));
+                            self.variables.set(identifier.value(), Flow::Value(Value::Object(objects.clone())));
                         },
                         _=> unreachable!()
                     },
-                    None => {let (start, end) = identifier.info(); return Err(InterpretError::InvalidCall(error(&self.expression, start, end, format!("class {} does not exist.", identifier.value()))))}
+                    None => {let (start, end) = identifier.info(); return Err(InterpretError::InvalidCall(error(&self.expression, &start, &end, format!("class {} does not exist.", identifier.value()))))}
                 };
-                Ok(Flow::Value(Value::Object(chlenosos)))
+                Ok(Flow::Value(Value::Object(objects)))
             }
-            Node::Object(identifier, field, _, _) => {
-                let _ = self.evaluate(identifier);
-                match self.variables.get(identifier.value()) {
-                    Some(object) => match object {
-                        Flow::Value(Value::Object(object)) => match object.get(&field.value()) {
-                            Some(value) => Ok(Flow::Value(value.clone())),
-                            _=> unreachable!()
-                        }
-                        _=> {println!("{:?}", object.type_name()); unreachable!()}
-                    }
-                    None => unreachable!()
+            Node::Object(identifier, attribute, _, _) => {
+                let evaluated = self.evaluate(identifier)?;
+                match evaluated {
+                    Flow::Value(Value::Object(attributes)) => match attributes.get(&attribute.value()) {
+                        Some(node) => Ok(self.evaluate(node)?),
+                        None => {let (start, end) = attribute.info(); Err(InterpretError::InvalidCall(error(&self.expression, &start, &end,format!("'{}' does not have attribute '{}'.", identifier.value(), attribute.value()))))}
+                    },
+                    _=> {let (start, end) = identifier.info(); Err(InterpretError::InvalidCall(error(&self.expression, &start, &end, format!("{} does not have attributes.", evaluated.type_name()))))}
                 }
             }
         }
     }
+
+    fn recursive_append(&mut self, identifier: &Node, indices: &mut Vec<Node>, victim: Node) -> Result<(Vec<Node>, String), InterpretError> {
+        match &identifier {
+            Node::Index(identifier, index, _, _) => {
+                indices.push(*index.clone());
+                self.recursive_append(identifier, indices, victim)
+            },
+            Node::Identifier(string_identifier, _, _) => {
+                let original = match self.evaluate(&identifier)? {
+                    Flow::Value(Value::List(list)) => convert(list),
+                    _=> unreachable!()
+                };
+                indices.reverse();
+                Ok((self.append_original_vec(original, indices, victim)?, string_identifier.clone()))
+            },
+            _=> unreachable!()
+        }
+    }
+    fn recursive_pop(&mut self, identifier: Node, indices: &mut Vec<Node>) -> Result<((Option<Node>, Vec<Node>), String), InterpretError> {
+        match &identifier {
+            Node::Index(identifier, index, _, _) => {
+                indices.push(*index.clone());
+                self.recursive_pop(*identifier.clone(), indices)
+            },
+            Node::Identifier(string_identifier, _, _) => {
+                let original = match self.evaluate(&identifier)? {
+                    Flow::Value(Value::List(list)) => convert(list),
+                    _=> unreachable!()
+                };
+                indices.reverse();
+                Ok((self.pop_original_vec(original, indices)?, string_identifier.clone()))
+            },
+            _=> unreachable!()
+        }
+    }
+    fn pop_original_vec(&mut self, mut original: Vec<Node>, indices: &Vec<Node>) -> Result<(Option<Node>, Vec<Node>), InterpretError> {
+        let mut indexed = &mut original;
+        for index in indices {
+            let usize_index = self.get_usize_index(index)?;
+            indexed = match indexed.get_mut(usize_index) {
+                Some(some) => match some {
+                    Node::List(list, _, _) => list,
+                    _=> unreachable!()
+                },
+                None => {let (start, end) = &index.info(); return Err(InterpretError::InvalidCall(error(&self.expression, &(start - 1), &(end + 1), format!("index {} is out of range. maximum index: {}.", usize_index, original.len() - 1))))}
+            }
+        }
+        let popped = indexed.pop();
+        Ok((popped, original))
+    }
+
+    fn append_original_vec(&mut self, mut original: Vec<Node>, indices: &Vec<Node>, victim: Node) -> Result<Vec<Node>, InterpretError> {
+        let mut indexed = &mut original;
+        let (last_index, indices) = indices.split_last().unwrap();
+        let last_usize_index = self.get_usize_index(last_index)?;
+        for index in indices {
+            let usize_index = self.get_usize_index(index)?;
+            let fallback = indexed[usize_index].clone();
+            indexed = match &mut indexed[usize_index] {
+                Node::List(list, _, _) => list,
+                _=> {let (start, end) = &last_index.info(); return Err(InterpretError::InvalidCall(error(&self.expression.clone(), &(start - 1), &(end + 1), format!("you can not index from {}.", self.evaluate(&fallback)?.type_name()))))}
+            };
+        }
+        let mut true_victim: Vec<Node> = match indexed.get(last_usize_index) {
+            Some(some) => match some {
+                Node::List(list, _, _) => list.clone(),
+                _=> unreachable!()
+            },
+            None => {let (start, end) = &last_index.info(); return Err(InterpretError::InvalidCall(error(&self.expression, &(start - 1), &(end + 1), format!("index {} is out of range. maximum index: {}.", last_usize_index, original.len() - 1))))}
+        };
+        true_victim.push(victim);
+        indexed[last_usize_index] = Node::List(true_victim.clone(), 0, 0);
+        Ok(original)
+    }
+
+    fn get_usize_index(&mut self, last_index: &Node) -> Result<usize, InterpretError> {
+        match self.evaluate(&last_index)? {
+            Flow::Value(Value::Number(number)) => {let (start, end) = &last_index.info();
+                Ok(format_to_usize(number, &self.expression, start, end)?)
+            },
+            _=> unreachable!()
+        }
+    }
+
 }
 
-fn convert(shit: Vec<Flow>) -> Vec<Node> {
+fn format_to_usize(victim: f64, expression: &str, start: &usize, end: &usize) -> Result<usize, InterpretError> {
+    if victim.fract() != 0.0 {
+        {
+            Err(InterpretError::InvalidVariable(error(expression, &start, end, format!("float indexes like '{victim}' are not allowed."))))
+        }
+    } else if victim < 0.0 {
+        {
+            Err(InterpretError::InvalidVariable(error(expression, start, end, String::from("indexes can not be negative."))))
+        }
+    } else {
+        return Ok(victim as usize)
+    }
+}
+
+fn convert(list: Vec<Flow>) -> Vec<Node> {
     let mut converted = Vec::new();
-    for flow in shit {
+    for flow in list {
         match flow {
             Flow::Value(value) => match value {
                 Value::Number(number) => converted.push(Node::Number(number, 0, 0)),

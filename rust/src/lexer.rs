@@ -55,7 +55,7 @@ pub fn lex(expression: &str) -> Result<Vec<Token>, LexError> {
                         tokens.push(Token::NotEqual(index, index + 2));
                         continue;
                     }
-                    return Err(LexError::UnexpectedSymbol(error(expression, index, index  + 1, String::from("unexpected '!'."))))
+                    return Err(LexError::UnexpectedSymbol(error(expression, &index, &(index  + 1), String::from("unexpected '!'."))))
                 }
             }
             character if character.is_whitespace() => continue,
@@ -72,11 +72,11 @@ pub fn lex(expression: &str) -> Result<Vec<Token>, LexError> {
                     }
                 }
                 if number.chars().last().unwrap() == '.' {
-                    return Err(LexError::InvalidNumber(error(expression, index, index + number.len(), format!("unexpected end of number '{number}'."))));
+                    return Err(LexError::InvalidNumber(error(expression, &index, &(index + number.len()), format!("unexpected end of number '{number}'."))));
                 }
                 let num: f64 = match number.parse() {
                     Ok(number) => number,
-                    Err(_) => return Err(LexError::InvalidNumber(error(expression, index, index + number.len(), format!("unexpected '.' in number '{number}'."))))
+                    Err(_) => return Err(LexError::InvalidNumber(error(expression, &index, &(index + number.len()), format!("unexpected '.' in number '{number}'."))))
                 };
                 tokens.push(Token::Number(num, index, index + number.len()))
             }
@@ -131,11 +131,11 @@ pub fn lex(expression: &str) -> Result<Vec<Token>, LexError> {
                     string.remove(0);
                 }
                 else {
-                    return Err(LexError::InvalidString(error(expression, start, end, String::from("invalid string."))))
+                    return Err(LexError::InvalidString(error(expression, &start, &end, String::from("invalid string."))))
                 }
                 tokens.push(Token::String(string, start, end))
             }
-            _ => return Err(LexError::UnknownSymbol(error(expression, index, index + 1, format!("'{character}' is invalid."))))
+            _ => return Err(LexError::UnknownSymbol(error(expression, &index, &(index + 1), format!("'{character}' is invalid."))))
         }
     }
     Ok(tokens)

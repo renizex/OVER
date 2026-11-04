@@ -45,6 +45,7 @@ pub fn equal(a: Flow, b: Flow) -> Result<bool, InterpretError> {
             (Value::Number(a), Value::Number(b)) => Ok(a == b),
             (Value::String(a), Value::String(b)) => Ok(a == b),
             (Value::Bool(a), Value::Bool(b)) => Ok(a == b),
+            (Value::Object(a), Value::Object(b)) => Ok(a == b),
             _ => Err(InterpretError::InvalidType(format!("ERROR: expected {}, got {}.", a.type_name(), b.type_name())))
         }
         _ => Err(InterpretError::InvalidType(format!("ERROR: expected {}, got {}.", a.type_name(), b.type_name())))

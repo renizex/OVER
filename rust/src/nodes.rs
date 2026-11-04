@@ -1,6 +1,6 @@
 use crate::tokens::{Token};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Node {
     Number(f64, usize, usize),
     Identifier(String, usize, usize),
@@ -83,7 +83,7 @@ impl Node {
             Node::Function(identifier, _, _, _, _) => identifier.value(),
             Node::FunctionCall(identifier, _, _, _) => identifier.value(),
             Node::Return(_, _, _) => String::from("return"),
-            Node::Index(list, index , _, _) => format!("{}[{}]", list.value(), index.value()),
+            Node::Index(list, index, _, _) => format!("{}[{}]", list.value(), index.value()),
             Node::Class(identifier, fields , _, _) => {let vector: Vec<String> = fields.iter().map(|x| x.value()).collect(); format!("{} {{{}", identifier.value(), vector.join(" "))},
             Node::ClassCall(identifier, _ , _, _) => identifier.value(),
             Node::Object(identifier, _, _, _) => identifier.value()

@@ -1,5 +1,6 @@
 use std::fmt;
 
+#[derive(Debug)]
 pub enum InterpretError {
     InvalidVariable(String),
     InvalidOperator(String),
@@ -59,7 +60,7 @@ impl fmt::Display for LexError {
     }
 }
 
-pub fn error(expression: &str, start: usize, end: usize, msg: String) -> String {
-    let pointer: String = " ".repeat(start) + &"^".repeat(end - start);
+pub fn error(expression: &str, start: &usize, end: &usize, msg: String) -> String {
+    let pointer: String = " ".repeat(*start) + &"^".repeat(end - start);
     format!("    ERROR: {msg}\n    {expression}    {pointer}")
 }

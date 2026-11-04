@@ -1,4 +1,4 @@
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Token {
     Number(f64, usize, usize),
     Identifier(String, usize, usize),

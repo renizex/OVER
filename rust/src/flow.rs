@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use crate::errors::InterpretError;
 use crate::nodes::Node;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 #[derive(Debug)]
 pub enum Flow {
     Value(Value),
@@ -11,10 +11,10 @@ pub enum Flow {
     Return(Option<Node>),
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 #[derive(Debug)]
 pub enum Value {
-    Object(HashMap<String, Value>),
+    Object(HashMap<String, Node>),
     Number(f64),
     Bool(bool),
     String(String),
