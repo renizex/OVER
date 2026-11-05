@@ -25,43 +25,28 @@ pub enum Value {
 impl Flow {
     pub fn expect_number(&self) -> Result<f64, InterpretError> {
         match self {
-            Flow::Value(value) => match value {
-                Value::Number(value) => Ok(*value),
-                _ => Err(InterpretError::UnexpectedValue(format!("ERROR: expected number, got {}.", self.type_name()))),
-            }
+            Flow::Value(Value::Number(value)) => Ok(*value),
             _ => Err(InterpretError::UnexpectedValue(format!("ERROR: expected number, got {}.", self.type_name()))),
         }
     }
 
     pub fn expect_bool(&self) -> Result<bool, InterpretError> {
         match self {
-            Flow::Value(value) => match value {
-                Value::Bool(value) => Ok(*value),
-                _ => Err(InterpretError::UnexpectedValue(format!("ERROR: expected number, got {}.", self.type_name()))),
-            }
+            Flow::Value(Value::Bool(value)) => Ok(*value),
             _ => Err(InterpretError::UnexpectedValue(format!("ERROR: expected number, got {}.", self.type_name()))),
         }
     }
 
     pub fn option_break(&self) -> bool {
-        match self {
-            Flow::Break => true,
-            _ => false
-        }
+        matches!(self, Flow::Break)
     }
 
     pub fn option_continue(&self) -> bool {
-        match self {
-            Flow::Continue => true,
-            _ => false
-        }
+        matches!(self, Flow::Continue)
     }
 
     pub fn option_return(&self) -> bool {
-        match self {
-            Flow::Return(_) => true,
-            _ => false
-        }
+        matches!(self, Flow::Return(_))
     }
 
     pub fn type_name(&self) -> &str {

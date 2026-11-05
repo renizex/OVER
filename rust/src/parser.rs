@@ -9,11 +9,11 @@ struct Parser {
     expression: String,
 }
 
-pub fn parse(tokens: &Vec<Token>, expression: &str) -> Result<Node, ParseError> {
+pub fn parse(tokens: &[Token], expression: &str) -> Result<Node, ParseError> {
     let mut nodes = Vec::<Node>::new();
     let mut parser = Parser {
         current_index: 0,
-        tokens: tokens.clone(),
+        tokens: tokens.to_owned(),
         expression: expression.to_string(),
     };
 
@@ -37,11 +37,9 @@ impl Parser {
     }
 
     fn optional(&mut self, expected: &[&str]) -> Option<Token> {
-        if let Some(token) = self.current() {
-            if expected.contains(&&*token.value()) {
+        if let Some(token) = self.current() && expected.contains(&&*token.value()) {
                 return Some(token.clone())
             }
-        }
         None
     }
 
@@ -83,7 +81,7 @@ impl Parser {
             return Err(ParseError::UnexpectedEndOfInput(error(&self.expression, &start, &(end + 2), String::from("unclosed brace inside of 'if' statement."))))
         }
         let body: Node = self.parse_block()?;
-        if let Some(_) =  self.optional(&["else"]) {
+        if self.optional(&["else"]).is_some() {
             self.advance();
             let elsebody = self.parse_block()?;
             return Ok(Node::If(Box::new(condition), Box::new(body), Some(Box::new(elsebody)), start, self.current_index))
@@ -103,7 +101,7 @@ impl Parser {
             return Err(ParseError::UnexpectedEndOfInput(error(&self.expression, &start, &(end + 2), String::from("unclosed brace inside of 'while' statement."))))
         }
         let body: Node = self.parse_block()?;
-        if let Some(_) =  self.optional(&["else"]) {
+        if self.optional(&["else"]).is_some() {
             self.advance();
             let elsebody = self.parse_block()?;
             return Ok(Node::While(Box::new(condition), Box::new(body), Some(Box::new(elsebody)), start, self.current_index))
@@ -172,7 +170,7 @@ impl Parser {
         self.consume(&["{"])?;
         let start = self.current_index;
         let mut nodes = Vec::new();
-        while let None = self.optional(&["}"]) {
+        while self.optional(&["}"]).is_none() {
             nodes.push(self.parse_statement()?);
         }
         self.consume(&["}"])?;
@@ -195,7 +193,7 @@ impl Parser {
 
     fn parse_assignment(&mut self) -> Result<Node, ParseError> {
         let mut left: Node = self.parse_comparison()?;
-        if let Some(_) = self.optional(&["="]) {
+        if self.optional(&["="]).is_some() {
             self.advance();
             let right: Node = self.parse_comparison()?;
             let (variable, start) = match left {
@@ -243,7 +241,7 @@ impl Parser {
     }
 
     fn parse_unary(&mut self) -> Result<Node, ParseError> {
-        if let Some(_) = self.optional(&["-"]) {
+        if self.optional(&["-"]).is_some() {
             self.advance();
             let expression: Node = self.parse_unary()?;
             return Ok(Node::UnaryMinus(Box::new(expression)))
@@ -257,24 +255,24 @@ impl Parser {
             let (start, _) = self.current().unwrap().info();
             if postfix.value() == "[" {
                 self.advance();
-                let index = self.parse_factor()?;
+                let index = self.parse_expression()?;
                 if !self.optional(&["]"]).is_some() {
                     self.consume(&["]"])?;
                 }
                 let (_, end) = self.current().unwrap().info();
                 self.consume(&["]"])?;
-                prefix = Node::Index(Box::new(prefix.clone()), Box::new(index), end, start);
+                prefix = Node::Index(Box::new(prefix.clone()), Box::new(index), start, end);
             }
             else if postfix.value() == "(" {
                 self.advance();
                 let mut arguments = Vec::new();
-                if let Some(_) = self.optional(&[")"]) {
+                if self.optional(&[")"]).is_some() {
                     let (_, end) = self.current().unwrap().info();
                     self.advance();
                     return Ok(Node::FunctionCall(Box::new(prefix), arguments, start, end))
                 }
                 arguments.push(self.parse_expression()?);
-                while let Some(_) = self.optional(&[","]) {
+                while self.optional(&[","]).is_some() {
                     self.advance();
                     arguments.push(self.parse_expression()?);
                 }
@@ -306,13 +304,13 @@ impl Parser {
                 if self.optional(&["("]).is_some() {
                     self.advance();
                     let mut arguments = Vec::new();
-                    if let Some(_) = self.optional(&[")"]) {
+                    if self.optional(&[")"]).is_some() {
                         let (_, end) = self.current().unwrap().info();
                         self.advance();
                         return Ok(Node::FunctionCall(Box::new(postfix), vec![prefix], start, end))
                     }
                     arguments.push(self.parse_expression()?);
-                    while let Some(_) = self.optional(&[","]) {
+                    while self.optional(&[","]).is_some() {
                         self.advance();
                         arguments.push(self.parse_expression()?);
                     }
@@ -360,6 +358,7 @@ impl Parser {
                     Ok(Node::List(list, start, end))
                 },
                 Token::Bool(bool, start, end) => {let (bool, start, end) = (*bool, *start, *end); self.advance(); Ok(Node::Bool(bool, start, end))},
+                Token::Nothing(start, end) => {let (start, end) = (*start, *end); self.advance(); Ok(Node::Nothing(start, end))},
                 Token::OpenParenthesis(_, _) => {
                     self.advance();
                     let expression = self.parse_expression()?;

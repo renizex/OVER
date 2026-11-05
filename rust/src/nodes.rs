@@ -6,6 +6,7 @@ pub enum Node {
     Identifier(String, usize, usize),
     String(String, usize, usize),
     Bool(bool, usize, usize),
+    Nothing(usize, usize),
     List(Vec<Node>, usize, usize),
     Binary(Box<Node>, Token, Box<Node>),
     UnaryMinus(Box<Node>),
@@ -32,6 +33,7 @@ impl Node {
             Node::Identifier(_, start, end) => (*start, *end),
             Node::String(_, start, end) => (*start, *end),
             Node::Bool(_, start, end) => (*start, *end),
+            Node::Nothing(start, end) => (*start, *end),
             Node::List(_, start, end) => (*start, *end),
             Node::Binary(start_node, _, end_node) => {
                 let (start, _) = start_node.info();
@@ -62,6 +64,7 @@ impl Node {
             Node::Identifier(value, _, _) => value.clone(),
             Node::String(value, _, _) => value.clone(),
             Node::Bool(value, _, _) => value.to_string(),
+            Node::Nothing(_, _) => "nothing".to_string(),
             Node::List(list, _, _) => {let result: Vec<String> = list.iter().map(|x| x.value()).collect(); "[".to_string() + &result.join(", ") + "]"},
             Node::Binary(start_node, operator, end_node) => {let start = start_node.value(); let end = end_node.value(); start + &operator.value() + &end},
             Node::UnaryMinus(node) => "-".to_owned() + &node.value(),

@@ -5,13 +5,13 @@ use untitled::interpreter::interpret;
 fn run(expression: &str) -> String {
     let tokens = match lex(expression) {
         Ok(tokens) => tokens,
-        Err(_) => { panic!("ты обосрался") }
+        Err(_) => {panic!("ты обосрался") }
     };
     let nodes = match parse(&tokens, expression) {
         Ok(nodes) => nodes,
         Err(_) => { panic!("ты обосрался") }
     };
-    match interpret(&nodes, &expression) {
+    match interpret(&nodes, expression) {
         Ok(flow) => flow.display(),
         Err(_) => { panic!("ты обосрался") }
     }

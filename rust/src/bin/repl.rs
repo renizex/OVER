@@ -1,5 +1,6 @@
 use untitled::*;
 use std::io::{self, Write};
+use untitled::flow::{Flow, Value};
 
 fn main() {
     let mut expression: String = String::new();
@@ -36,6 +37,8 @@ fn main() {
             Ok(result) => result,
             Err(error) => {println!("{error}\n"); continue}
         };
-        println!("{}\n", result.display());
+        if !matches!(result, Flow::Value(Value::Nothing)) {
+            println!("ERROR: try to use print() function to see your output.")
+        }
     }
 }

@@ -71,7 +71,7 @@ pub fn lex(expression: &str) -> Result<Vec<Token>, LexError> {
                         break;
                     }
                 }
-                if number.chars().last().unwrap() == '.' {
+                if number.ends_with('.') {
                     return Err(LexError::InvalidNumber(error(expression, &index, &(index + number.len()), format!("unexpected end of number '{number}'."))));
                 }
                 let num: f64 = match number.parse() {
@@ -105,6 +105,7 @@ pub fn lex(expression: &str) -> Result<Vec<Token>, LexError> {
                     "function" => tokens.push(Token::Function(index, index + 8)),
                     "return" => tokens.push(Token::Return(index, index + 6)),
                     "class" => tokens.push(Token::Class(index, index + 5)),
+                    "nothing" => tokens.push(Token::Nothing(index, index + 7)),
                     _ => tokens.push(Token::Identifier(variable, index, length))
                 }
             }
@@ -126,7 +127,7 @@ pub fn lex(expression: &str) -> Result<Vec<Token>, LexError> {
                     }
                 }
                 let (start, end) = (index, index + string.chars().count());
-                if string.chars().last() == Some('"') && string.chars().next() == Some('"') {
+                if string.ends_with('"') && string.starts_with('"') {
                     string.pop();
                     string.remove(0);
                 }

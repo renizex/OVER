@@ -43,6 +43,7 @@ impl Interpret {
             Node::Number(value, _, _) => Ok(Flow::Value(Value::Number(*value))),
             Node::Identifier(value, _, _) => Ok(resolve_variable(&self.variables, value)?),
             Node::String(value, _, _) => Ok(Flow::Value(Value::String(value.clone()))),
+            Node::Nothing(_, _) => Ok(Flow::Value(Nothing)),
             Node::Binary(left, operator, right) => {
                 let left: Flow = self.evaluate(left)?;
                 let right: Flow = self.evaluate(right)?;
@@ -163,7 +164,7 @@ impl Interpret {
                                     let mut indices = vec![*index];
                                     self.recursive_append(&identifier, &mut indices, argument)?
                                 },
-                                _=> unreachable!()
+                                _=> {let (start, end) = identifier.info(); return Err(InterpretError::InvalidCall(error(&self.expression.clone(), &start, &end, format!("{} does not have attributes.", self.evaluate(&node)?.type_name()))))}
                             }
                         }
                         _=> unreachable!()
@@ -185,6 +186,14 @@ impl Interpret {
                     self.evaluate(&Node::Assignment(identifier, Box::new(Node::List(list, 0, 0)), 0, 0))?;
                     return Ok(popped)
                 }
+                if &identifier.value() == "print" {
+                    let mut formatted_output = Vec::new();
+                    for node in arguments {
+                        formatted_output.push(self.evaluate(node)?.display())
+                    }
+                    println!("{}", formatted_output.join(", "));
+                    return Ok(Flow::Value(Nothing))
+                }
                 match self.functions.get(&identifier.value()).cloned() {
                     Some(value) => match value {
                         Node::Function(_, parameters, body, _, _) => {
@@ -200,8 +209,8 @@ impl Interpret {
                             self.variables = Scope{local, parent: self.variables.parent.clone()};
                             match self.evaluate(&body.clone())? {
                                 Flow::Return(expression) => {
-                                    if expression.is_some() {
-                                        return self.evaluate(&expression.unwrap())
+                                    if let Some(expression) = expression {
+                                        return self.evaluate(&expression)
                                     }
                                     Ok(Flow::Value(Nothing))
                                 }
@@ -230,23 +239,15 @@ impl Interpret {
                 match &flow {
                     Flow::Value(Value::List(list)) => match index {
                         Flow::Value(Value::Number(index)) => {
-                            if index.fract() != 0.0 {
-                                {let (start, end) = (*start, *end); Err(InterpretError::InvalidVariable(error(&self.expression, &start, &end, format!("index '{index}' is invalid. try '0'."))))}
-                            }
-                            else if index < 0.0 {
-                                {let (start, end) = (*start, *end); Err(InterpretError::InvalidVariable(error(&self.expression, &start, &end, String::from("index can not be negative."))))}
-                            }
-                            else {
-                                let index: usize = index as usize;
+                            let index = format_to_usize(index, &self.expression, start, end)?;
                                 match list.get(index) {
                                     Some(value) => Ok(value.clone()),
-                                    None => {let (start, end) = (*start, *end); Err(InterpretError::InvalidVariable(error(&self.expression, &start, &end, format!("index '{index}' out of range."))))}
+                                    None => {let (start, end) = (*start, *end); let maximum = if !list.is_empty() {(list.len() - 1).to_string()} else {"list is empty".to_string()}; Err(InterpretError::InvalidVariable(error(&self.expression, &start, &end, format!("index {} out of range. maximum index: {}", index,  maximum))))}
                                 }
                             }
-                        }
                         _ => {let (start, end) = (*start, *end); Err(InterpretError::InvalidVariable(error(&self.expression, &start, &end, String::from("index can only be integer."))))}
                     },
-                    _ => {let (start, end) = (start - flow.display().len(), *start); Err(InterpretError::InvalidVariable(error(&self.expression, &start, &end, format!("'{}' is not a list.", flow.display()))))}
+                    _ => {let (start, end) = identifier.info(); Err(InterpretError::InvalidVariable(error(&self.expression, &start, &end, format!("'{}' is not a list.", flow.display()))))}
                 }
             },
             Node::Class(identifier, _, _, _) => {
@@ -292,7 +293,7 @@ impl Interpret {
                 self.recursive_append(identifier, indices, victim)
             },
             Node::Identifier(string_identifier, _, _) => {
-                let original = match self.evaluate(&identifier)? {
+                let original = match self.evaluate(identifier)? {
                     Flow::Value(Value::List(list)) => convert(list),
                     _=> unreachable!()
                 };
@@ -316,7 +317,7 @@ impl Interpret {
                 indices.reverse();
                 Ok((self.pop_original_vec(original, indices)?, string_identifier.clone()))
             },
-            _=> unreachable!()
+            _=> {let (start, end) = identifier.info(); Err(InterpretError::InvalidCall(error(&self.expression.clone(), &start, &end, format!("{} does not have attributes.", self.evaluate(&identifier)?.type_name()))))}
         }
     }
     fn pop_original_vec(&mut self, mut original: Vec<Node>, indices: &Vec<Node>) -> Result<(Option<Node>, Vec<Node>), InterpretError> {
@@ -328,14 +329,14 @@ impl Interpret {
                     Node::List(list, _, _) => list,
                     _=> unreachable!()
                 },
-                None => {let (start, end) = &index.info(); return Err(InterpretError::InvalidCall(error(&self.expression, &(start - 1), &(end + 1), format!("index {} is out of range. maximum index: {}.", usize_index, original.len() - 1))))}
+                None => {let (start, end) = &index.info(); let maximum = if !original.is_empty() {(original.len() - 1).to_string()} else {"list is empty".to_string()}; return Err(InterpretError::InvalidCall(error(&self.expression, &(start - 1), &(end + 1), format!("index {} out of range. maximum index: {}.", usize_index, maximum))))}
             }
         }
         let popped = indexed.pop();
         Ok((popped, original))
     }
 
-    fn append_original_vec(&mut self, mut original: Vec<Node>, indices: &Vec<Node>, victim: Node) -> Result<Vec<Node>, InterpretError> {
+    fn append_original_vec(&mut self, mut original: Vec<Node>, indices: &[Node], victim: Node) -> Result<Vec<Node>, InterpretError> {
         let mut indexed = &mut original;
         let (last_index, indices) = indices.split_last().unwrap();
         let last_usize_index = self.get_usize_index(last_index)?;
@@ -352,7 +353,7 @@ impl Interpret {
                 Node::List(list, _, _) => list.clone(),
                 _=> unreachable!()
             },
-            None => {let (start, end) = &last_index.info(); return Err(InterpretError::InvalidCall(error(&self.expression, &(start - 1), &(end + 1), format!("index {} is out of range. maximum index: {}.", last_usize_index, original.len() - 1))))}
+            None => {let (start, end) = &last_index.info(); let maximum = if !original.is_empty() {(original.len() - 1).to_string()} else {"list is empty".to_string()}; return Err(InterpretError::InvalidCall(error(&self.expression, &(start - 1), &(end + 1), format!("index {} out of range. maximum index: {}.", last_usize_index, maximum))))}
         };
         true_victim.push(victim);
         indexed[last_usize_index] = Node::List(true_victim.clone(), 0, 0);
@@ -360,27 +361,26 @@ impl Interpret {
     }
 
     fn get_usize_index(&mut self, last_index: &Node) -> Result<usize, InterpretError> {
-        match self.evaluate(&last_index)? {
+        match self.evaluate(last_index)? {
             Flow::Value(Value::Number(number)) => {let (start, end) = &last_index.info();
                 Ok(format_to_usize(number, &self.expression, start, end)?)
             },
             _=> unreachable!()
         }
     }
-
 }
 
 fn format_to_usize(victim: f64, expression: &str, start: &usize, end: &usize) -> Result<usize, InterpretError> {
     if victim.fract() != 0.0 {
         {
-            Err(InterpretError::InvalidVariable(error(expression, &start, end, format!("float indexes like '{victim}' are not allowed."))))
+            Err(InterpretError::InvalidVariable(error(expression, start, end, format!("float indexes like '{victim}' are not allowed."))))
         }
     } else if victim < 0.0 {
         {
             Err(InterpretError::InvalidVariable(error(expression, start, end, String::from("indexes can not be negative."))))
         }
     } else {
-        return Ok(victim as usize)
+        Ok(victim as usize)
     }
 }
 
@@ -393,6 +393,7 @@ fn convert(list: Vec<Flow>) -> Vec<Node> {
                 Value::Bool(bool) => converted.push(Node::Bool(bool, 0, 0)),
                 Value::String(string) => converted.push(Node::String(string, 0, 0)),
                 Value::List(list) => converted.push(Node::List(convert(list), 0, 0)),
+                Nothing => converted.push(Node::Nothing(0, 0)),
                 _ => unreachable!()
             }
             _ => unreachable!()
@@ -421,10 +422,7 @@ impl Scope {
     fn get(&self, target: String) -> Option<Flow> {
         match self.local.get(&target) {
             Some(value) => Some(value.clone()),
-            None => match self.parent.get(&target) {
-                Some(value) => Some(value.clone()),
-                None => None
-            }
+            None => self.parent.get(&target).cloned()
         }
     }
 

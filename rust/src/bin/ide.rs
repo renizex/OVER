@@ -1,4 +1,5 @@
 use untitled::{interpreter, lexer, parser};
+use untitled::flow::{Flow, Value};
 
 fn main() {
     let path: String = match std::env::args().nth(1) {
@@ -21,5 +22,7 @@ fn main() {
         Ok(result) => result,
         Err(error) => {println!("{error}\n"); return}
     };
-    println!("{}\n", result.display());
+    if !matches!(result, Flow::Value(Value::Nothing)) {
+        println!("ERROR: try to use print() function to see your output.")
+    }
 }
