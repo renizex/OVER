@@ -113,7 +113,13 @@ pub fn lex(expression: &str) -> Result<Vec<Token>, LexError> {
                 let mut string: String = String::new();
                 string.push(character);
                 if let Some((_, character)) = characters.next() {
-                    string.push(character)
+                    string.push(character);
+                    if character == '"' {
+                        string.pop();
+                        string.remove(0);
+                        tokens.push(Token::String(string, index, index + 2));
+                        continue
+                    }
                 }
                 while let Some(&(_, character)) = characters.peek() {
                     if character != '"' {

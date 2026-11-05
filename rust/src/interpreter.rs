@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::io::Write;
 use crate::tokens::Token;
 use crate::nodes::Node;
 use crate::flow::{Value, Flow};
@@ -193,6 +194,18 @@ impl Interpret {
                     }
                     println!("{}", formatted_output.join(", "));
                     return Ok(Flow::Value(Nothing))
+                }
+                if &identifier.value() == "input" {
+                    if arguments.len() > 1 {
+                        let (start, end) = identifier.info(); return Err(InterpretError::InvalidCall(error(&self.expression, &start, &end, format!("expected 1 arguments, got {}.", arguments.len() - 1))))
+                    }
+                    if let Some(some) = arguments.first() {
+                        print!("{}", self.evaluate(some)?.display());
+                        std::io::stdout().flush().map_err(|error| InterpretError::UnexpectedValue(error.to_string()))?;
+                    }
+                    let mut input = String::new();
+                    std::io::stdin().read_line(&mut input).map_err(|error| InterpretError::UnexpectedValue(error.to_string()))?;
+                    return Ok(Flow::Value(Value::String(input.replace("\n", "").replace("\r", ""))))
                 }
                 match self.functions.get(&identifier.value()).cloned() {
                     Some(value) => match value {

@@ -1,39 +1,6 @@
-print("ПЕРВАЯ ЧАСТЬ")
-x = [1, 2, 3]
-print(x.append(4))
-print(x)
-print(x.pop())
-print(x)
-print(x.append([5, 6]))
-print(x)
-
-print("ВТОРАЯ ЧАСТЬ")
-x = [[1, 2], [3, 4]]
-print(x[0].append(5))
-print(x[1].append(6))
-print(x[0].pop())
-print(x[1].pop())
-print(x)
-
-print("ТРЕТЬЯ ЧАСТЬ")
-x = [1, 2, 3]
-print(x.pop(), x.pop(), x.pop())
-print(x)
-
-print("ЧЕТВЕРТАЯ ЧАСТЬ")
-x = [1, 2, 3]
-print(x.pop(), x.pop(), x.pop(), x.pop())
-print(x)
-
-print("ПЯТАЯ ЧАСТЬ")
-print(print(1))
-print(print(1), print(2))
-print([1, 2].append(3))
-print([1, 2].pop())
-
-print("ШЕСТАЯ ЧАСТЬ")
-x = [[1, 2], [3, 4]]
-print(x[0].append(x[1].pop()))
-print(x)
-print(x[1].append(x[0].pop()))
-print(x)
+print("всем привет ребята это тест возможностей моего языка")
+print("введи свое имя:")
+name = input("< ")
+print("введи свой возраст:")
+age = input("< ")
+print("ты " + name + ", тебе " + age + ". мое почтение.")
