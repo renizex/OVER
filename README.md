@@ -1,8 +1,7 @@
 # OVER
-AST-based interpreted programming language written in Python.
-
-## requirements
-Python 3.11+
+AST-based interpreted programming language implemented in Rust and Python.
+Rust implementation is the main and more advanced one.
+OVER's main goal is to be simple and understandable for beginners, while also helping me understand how to build a programming language from scratch.
 
 ## usage
 
@@ -10,94 +9,79 @@ Python 3.11+
 - git clone https://github.com/renizex/OVER.git
 - cd OVER
 
-### CLI
-python -m over.main
+### REPL
+cargo run --bin repl
 
 ### IDE
-python IDE/ide.py
+cargo run --bin ide main.over
 
 ## features
 
 ### operations
-- basic operators: '+', '-', '*', '/',
-- power: '^', assign: '=', modulo: '%',
-- comparison operators: '>', '<', '==', '<=', '>=',
+- basic operators: '+', '-', '/', '*',
+- assignment: '=',
+- comparison operators: '>', '<', "==", "!=", "<=", ">=",
 - parentheses.
 
 ### variables
 - variable assignment, reassignment,
-- variables can store function references.
+- variables can store function references, input() results, classes objects and every type.
 
 ### functions
-- user-defined functions,
-- function calls,
+- buitins: "print()", "input()",
+- list methods: "pop()", "append()",
+- user defined functions and function calls,
+- local scope,
 - recursion,
-- if, else, while, return statements,
-- local scope.
+- control flow: "if", "else", "while", "loop", "return", "break", "continue".
+
+### classes
+- creating class instances with user defined values,
+- attributes,
+- object creation and manipulation.
+
+### types
+- number
+- string
+- list
+- bool
+- object
 
 ### custom errors
-- syntax errors are being highlighted with a cursor,
-- useful explanations.
+- syntax errors highlighted with a cursor,
+- useful and short explanations.
 
-## CLI examples
-- 'print(2 + 2)' -> 4,
-- 'print(6 + 3 ^ 2 / 3)' -> 9,
-- 'print(2+3*4)' -> 14,
-- 'print((2+3) * 4)' -> 20,
-- 'x = 500' -> memory: x: 500,
-- 'x = 1000 if x > 100 {print(x + 100)}' -> 1100,
-- 'function func(x, y) {if x > y {return x + y} else {return x - y}} print(func(10, 5))' -> 15.
+## REPL examples
+- "print(2 + 2)" -> 4,
+- "x = 1000 print(x)" -> 1000,
+- "x = 100 if x > 50 {print(500)} else {print(666)}" -> 500,
+- "function func(x, y) {if x > y {return x + y} else {return x - y}} print(func(10, 5))" -> 15,
+- "class Player{health damage resistance} player = Player{100 20 1} print(player.health - 10)" -> 90,
+- "x = [1, 2, [3, 4, [4, 5]]] x[2].append(50) print(x[2][2].pop() + 95)" -> 100.
 
-## IDE examples
-
-```OVER
-число = 500
-
-функция удвоить(значение) {
-return значение * 2
+## IDE example
+function factorial(n) {
+    result = 1
+    while n > 1 {
+        result = result * n
+        n = n - 1
+    }
+    return result
 }
 
-print(удвоить(число))
-```
-
--> 1000
-
-```OVER
 x = 5
-y = 3
+print(factorial(x))
 
-function power(x, y) {
-return x ^ y
-}
-
-z = power(x, y)
-print(z)
-```
-
- -> 125
-
-## IDE
-a small custom IDE made on Tkinter.
-
-### features
-- saving files with custom extension '.over',
-- opening them,
-- custom keybinds.
-
-### keybinds
-- ctrl c - copy,
-- ctrl v - paste,
-- ctrl x - cut text,
-- ctrl r - run,
-- ctrl a - select all,
-- ctrl d - delete all,
-- ctrl s - save file,
-- ctrl o - open new file.
+-> 120
 
 ## planned
-- improving error UX,
-- lists [],
-- string type.
+- user defined methods,
+- more builtin methods like len(),
+- russian language support,
+- hashmaps (maybe).
 
 ## status
 active development.
+
+Python implementation is no longer in development, though it still available.
+check OVER/python/README.md if you interested.
